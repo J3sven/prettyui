@@ -1,0 +1,806 @@
+local Sprites = require("src/core/sprites")
+local BigSpinner = require("src/big_spinner")
+local CheckboxButton = require("src/checkbox_button")
+local ComboBox = require("src/combo_box")
+local CollapseButton = require("src/collapse_button")
+local Cursor = require("src/core/cursor")
+local Divider = require("src/divider")
+local FancyButton = require("src/fancy_button")
+local ItemGrid = require("src/item_grid")
+local ItemSlot = require("src/item_slot")
+local List = require("src/list")
+local Layout = require("src/core/layout")
+local RadioButton = require("src/radio_button")
+local RibbonButton = require("src/ribbon_button")
+local SimpleButton = require("src/simple_button")
+local Slider = require("src/slider")
+local Spinner = require("src/spinner")
+local SpriteButton = require("src/sprite_button")
+local TextField = require("src/text_field")
+local Text = require("src/text")
+local Tabs = require("src/tabs")
+local Tooltip = require("src/tooltip")
+local Wheel = require("src/core/wheel")
+
+local Panel = {}
+Panel.__index = Panel
+
+local BORDER_SIZE = 4
+local TOGGLE_SIZE = 20
+local TOGGLE_INSET = 4
+local DEFAULT_WIDTH = 300
+local DEFAULT_HEIGHT = 160
+local DEFAULT_POPOUT_X = 80
+local DEFAULT_POPOUT_Y = 80
+local nextInstanceID = 0
+
+local function isAltDown()
+    return Keyboard.IsAvailable() and not Keyboard.IsBlocked() and Keyboard.IsAltDown()
+end
+
+local function clampAlpha(value)
+    return math.max(0, math.min(1, tonumber(value) or 1))
+end
+
+local function copyOptions(value)
+    local copy = {}
+    if type(value) == "table" then
+        for key, option in pairs(value) do copy[key] = option end
+    end
+    return copy
+end
+
+local function sprite(parent, spriteID)
+    local component = ui.Sprite.new(parent)
+    component.spriteID = spriteID
+    component.clickthrough = true
+    return component
+end
+
+local function createSurface(parent, options)
+    local surface = {}
+    local frame = Sprites.HUD_WINDOW
+    surface.root = ui.Layer.new(parent)
+    surface.root:SetPos(options.x, options.y, options.xAnchor or 0, options.yAnchor or 0)
+    surface.root:SetSize(options.width, options.height, options.widthAnchor or 0, options.heightAnchor or 0)
+    surface.root.clickthrough = options.clickthrough == true
+
+    surface.background = sprite(surface.root, frame.content)
+    surface.background:SetPos(BORDER_SIZE, BORDER_SIZE)
+    surface.background:SetSize(-BORDER_SIZE * 2, -BORDER_SIZE * 2, 1.0, 1.0)
+    surface.background.isTiling = true
+    surface.background.alpha = clampAlpha(options.backgroundAlpha)
+    surface.background.clickthrough = options.clickthrough == true
+
+    surface.top = sprite(surface.root, frame.top)
+    surface.top:SetPos(BORDER_SIZE, 0)
+    surface.top:SetSize(-BORDER_SIZE * 2, BORDER_SIZE, 1.0)
+    surface.top.isTiling = true
+
+    surface.bottom = sprite(surface.root, frame.bottom)
+    surface.bottom:SetPos(BORDER_SIZE, -BORDER_SIZE, 0, 1.0)
+    surface.bottom:SetSize(-BORDER_SIZE * 2, BORDER_SIZE, 1.0)
+    surface.bottom.isTiling = true
+
+    surface.right = sprite(surface.root, frame.side)
+    surface.right:SetPos(-BORDER_SIZE, BORDER_SIZE, 1.0)
+    surface.right:SetSize(BORDER_SIZE, -BORDER_SIZE * 2, 0, 1.0)
+    surface.right.isTiling = true
+
+    surface.left = sprite(surface.root, frame.side)
+    surface.left:SetPos(0, BORDER_SIZE)
+    surface.left:SetSize(BORDER_SIZE, -BORDER_SIZE * 2, 0, 1.0)
+    surface.left.isTiling = true
+    surface.right.isFlippedHorizontally = true
+
+    surface.topRight = sprite(surface.root, frame.cornerTop)
+    surface.topRight:SetPos(-BORDER_SIZE, 0, 1.0)
+    surface.topRight:SetSize(BORDER_SIZE, BORDER_SIZE)
+    surface.topRight.isFlippedHorizontally = true
+
+    surface.topLeft = sprite(surface.root, frame.cornerTop)
+    surface.topLeft:SetSize(BORDER_SIZE, BORDER_SIZE)
+
+    surface.bottomRight = sprite(surface.root, frame.cornerBottom)
+    surface.bottomRight:SetPos(-BORDER_SIZE, -BORDER_SIZE, 1.0, 1.0)
+    surface.bottomRight:SetSize(BORDER_SIZE, BORDER_SIZE)
+    surface.bottomRight.isFlippedHorizontally = true
+
+    surface.bottomLeft = sprite(surface.root, frame.cornerBottom)
+    surface.bottomLeft:SetPos(0, -BORDER_SIZE, 0, 1.0)
+    surface.bottomLeft:SetSize(BORDER_SIZE, BORDER_SIZE)
+
+    surface.content = ui.Layer.new(surface.root)
+    surface.content:SetPos(BORDER_SIZE, BORDER_SIZE)
+    surface.content:SetSize(-BORDER_SIZE * 2, -BORDER_SIZE * 2, 1.0, 1.0)
+    surface.content.clickthrough = options.clickthrough == true
+    surface.content.enabled = options.clickthrough ~= true
+
+    return surface
+end
+
+local function createToggle(surface, panel, popoutMode)
+    local button = ui.Sprite.new(surface.root)
+    button:SetPos(-TOGGLE_SIZE - TOGGLE_INSET, TOGGLE_INSET, 1.0)
+    button:SetSize(TOGGLE_SIZE, TOGGLE_SIZE)
+    button.clickthrough = false
+    local hovered = false
+    local pressed = false
+
+    local function update()
+        local states = popoutMode and Sprites.PANEL_POPOUT_BUTTON or Sprites.PANEL_DOCK_BUTTON
+        if pressed then
+            button.spriteID = states.mousedown
+        elseif hovered then
+            button.spriteID = states.hovered
+        else
+            button.spriteID = states.neutral
+        end
+    end
+
+    button:Subscribe(ui.Hook.ONMOUSEOVER, function()
+        hovered = true
+        update()
+        return true
+    end)
+    button:Subscribe(ui.Hook.ONMOUSELEAVE, function()
+        hovered = false
+        pressed = false
+        update()
+        return true
+    end)
+    button:Subscribe(ui.Hook.ONCLICK, function()
+        pressed = true
+        update()
+        return false
+    end)
+    button:Subscribe(ui.Hook.ONRELEASE, function()
+        local activate = pressed
+        pressed = false
+        update()
+        if activate then panel:SetPoppedOut(popoutMode) end
+        return false
+    end)
+    update()
+    button:MoveToFront()
+    return button
+end
+
+local function createDragLayer(surface, panel)
+    local layer = ui.Layer.new(surface.root)
+    layer:SetSize(0, 0, 1.0, 1.0)
+    layer.clickthrough = true
+    layer.enabled = false
+
+    layer:Subscribe(ui.Hook.ONCLICK, function()
+        if not isAltDown() then return true end
+        panel:_BeginDrag(surface)
+        return false
+    end)
+    layer:Subscribe(ui.Hook.ONHOLD, function()
+        return panel:_MoveDrag()
+    end)
+    layer:Subscribe(ui.Hook.ONDRAG, function()
+        return panel:_CreateDragCapture()
+    end)
+    layer:Subscribe(ui.Hook.ONMOUSELEAVE, function()
+        if panel.dragState then return panel:_CreateDragCapture() end
+        return true
+    end)
+    layer:Subscribe(ui.Hook.ONRELEASE, function()
+        return panel:_StopDrag()
+    end)
+    layer:Subscribe(ui.Hook.ONDRAGCOMPLETE, function()
+        return panel:_StopDrag()
+    end)
+    return layer
+end
+
+local function pairObjects(panel, dock, overlay)
+    local proxy = {}
+    rawset(proxy, "dock", dock)
+    rawset(proxy, "overlay", overlay)
+    return setmetatable(proxy, {
+        __index = function(_, key)
+            if key == "dock" or key == "overlay" then return rawget(proxy, key) end
+            local active = panel.poppedOut and overlay or dock
+            local value = active[key]
+            if type(value) ~= "function" then return value end
+            return function(_, ...)
+                local dockResult = dock[key](dock, ...)
+                local overlayResult = overlay[key](overlay, ...)
+                local result = panel.poppedOut and overlayResult or dockResult
+                if dockResult ~= nil and overlayResult ~= nil and
+                    (type(dockResult) == "table" or type(dockResult) == "userdata") and
+                    (type(overlayResult) == "table" or type(overlayResult) == "userdata") then
+                    return pairObjects(panel, dockResult, overlayResult)
+                end
+                return result
+            end
+        end,
+        __newindex = function(_, key, value)
+            dock[key] = value
+            overlay[key] = value
+        end,
+    })
+end
+
+local function configureOwner(surface, options)
+    local owner = {
+        content = surface.content,
+        contentWidth = surface.root.width - BORDER_SIZE * 2,
+        _onScrollWheel = options._onScrollWheel,
+    }
+    Layout.configure(owner, options.layout or options.textLayout)
+    return owner
+end
+
+function Panel.getSize(options)
+    options = options or {}
+    return options.width or DEFAULT_WIDTH, options.height or DEFAULT_HEIGHT
+end
+
+function Panel.new(parent, options, flowManaged)
+    options = options or {}
+    local width, height = Panel.getSize(options)
+    local parentContext = Tooltip.getContext(parent)
+    local overlayParent = options.overlayParent or (parentContext and parentContext.parent) or parent
+
+    local self = setmetatable({}, Panel)
+    nextInstanceID = nextInstanceID + 1
+    self.dragEventID = "prettyui_panel_drag_" .. tostring(nextInstanceID)
+    self.parent = parent
+    self.overlayParent = overlayParent
+    self._dockDraggable = flowManaged ~= true
+    self._canPopout = options.popout == true
+    self.popoutClickthrough = options.popoutClickthrough == true
+    self.popoutBackgroundAlpha = clampAlpha(options.popoutBackgroundAlpha or options.backgroundAlpha)
+    self.onPopoutChange = options.onPopoutChange
+    self.poppedOut = self._canPopout and options.poppedOut == true
+
+    self.dock = createSurface(parent, {
+        x = options.x or 0,
+        y = options.y or 0,
+        xAnchor = options.xAnchor,
+        yAnchor = options.yAnchor,
+        widthAnchor = options.widthAnchor,
+        heightAnchor = options.heightAnchor,
+        width = width,
+        height = height,
+        backgroundAlpha = options.backgroundAlpha,
+        clickthrough = false,
+    })
+    self.width = self.dock.root.width
+    self.height = self.dock.root.height
+    self.contentWidth = self.width - BORDER_SIZE * 2
+    self.overlay = createSurface(overlayParent, {
+        x = options.popoutX or DEFAULT_POPOUT_X,
+        y = options.popoutY or DEFAULT_POPOUT_Y,
+        xAnchor = options.popoutXAnchor,
+        yAnchor = options.popoutYAnchor,
+        width = options.popoutWidth or self.width,
+        height = options.popoutHeight or self.height,
+        backgroundAlpha = self.popoutBackgroundAlpha,
+        clickthrough = self.popoutClickthrough,
+    })
+    self.root = self.dock.root
+    self.content = self.dock.content
+    self.overlayContent = self.overlay.content
+    self.dockOwner = configureOwner(self.dock, options)
+    self.overlayOwner = configureOwner(self.overlay, options)
+    Wheel.bind(self.dock.root, options)
+    Wheel.bind(self.dock.background, options)
+    Wheel.bind(self.dock.content, options)
+
+    local dockTooltipParent = parentContext and parentContext.parent or parent
+    self.dockTooltipContext = Tooltip.registerContext(self.dock.content, dockTooltipParent, function(target)
+        local rootX = self.dock.root.x or 0
+        local rootY = self.dock.root.y or 0
+        if parentContext then rootX, rootY = parentContext.position(self.dock.root) end
+        return rootX + (self.dock.content.x or 0) + (target.x or 0),
+            rootY + (self.dock.content.y or 0) + (target.y or 0)
+    end, parentContext)
+    self.overlayTooltipContext = Tooltip.registerContext(self.overlay.content, overlayParent, function(target)
+        return (self.overlay.root.x or 0) + (self.overlay.content.x or 0) + (target.x or 0),
+            (self.overlay.root.y or 0) + (self.overlay.content.y or 0) + (target.y or 0)
+    end, nil)
+
+    if self._canPopout then
+        self.popoutButton = createToggle(self.dock, self, true)
+        self.dockButton = createToggle(self.overlay, self, false)
+        Wheel.bind(self.popoutButton, options)
+    end
+    if self._dockDraggable then self.dockDragLayer = createDragLayer(self.dock, self) end
+    if self._canPopout then self.overlayDragLayer = createDragLayer(self.overlay, self) end
+    self.dockTooltip = Tooltip.attach(self.dock.root, parent, options.tooltip)
+    self.overlayTooltip = Tooltip.attach(self.overlay.root, overlayParent, options.tooltip)
+    self:SetPopoutClickthrough(self.popoutClickthrough)
+    self:SetPoppedOut(self.poppedOut, false)
+    self:_SetAltDragActive(isAltDown())
+    Event.Logic.Subscribe(self.dragEventID, function()
+        self:_SetAltDragActive(isAltDown())
+    end)
+    return self
+end
+
+function Panel:_SetAltDragActive(active)
+    local activeSurface
+    if active == true then
+        if self.poppedOut and self._canPopout then
+            activeSurface = self.overlay
+        elseif self._dockDraggable then
+            activeSurface = self.dock
+        end
+    end
+    if self.altDragSurface == activeSurface then return end
+    self.altDragSurface = activeSurface
+
+    local function updateLayer(layer, surface)
+        if not layer then return end
+        local enabled = activeSurface == surface
+        layer.enabled = enabled
+        layer.clickthrough = not enabled
+        Cursor.apply(layer, config.Cursor.CURSOR_USE, enabled)
+        if enabled then layer:MoveToFront() end
+    end
+    updateLayer(self.dockDragLayer, self.dock)
+    updateLayer(self.overlayDragLayer, self.overlay)
+
+    if not activeSurface then
+        self:_StopDrag()
+        if self.popoutButton then self.popoutButton:MoveToFront() end
+        if self.dockButton then self.dockButton:MoveToFront() end
+    end
+end
+
+function Panel:_BeginDrag(surface)
+    local mouse = Mouse.GetPosition()
+    if surface ~= self.altDragSurface or not mouse or not isAltDown() then return false end
+    self.dragState = {
+        surface = surface,
+        mouseX = mouse.x,
+        mouseY = mouse.y,
+        panelX = surface.root.x,
+        panelY = surface.root.y,
+    }
+    surface.root:MoveToFront()
+    local dragLayer = surface == self.overlay and self.overlayDragLayer or self.dockDragLayer
+    if dragLayer then dragLayer:MoveToFront() end
+    return false
+end
+
+function Panel:_MoveDrag()
+    if not self.dragState then return false end
+    if not isAltDown() then return self:_StopDrag() end
+    local mouse = Mouse.GetPosition()
+    if mouse then
+        local drag = self.dragState
+        drag.surface.root:SetPos(
+            drag.panelX + mouse.x - drag.mouseX,
+            drag.panelY + mouse.y - drag.mouseY
+        )
+    end
+    return false
+end
+
+function Panel:_CreateDragCapture()
+    if not self.dragState or self.dragCapture then return false end
+    local captureParent = self.dragState.surface == self.overlay and self.overlayParent or self.parent
+    self.dragCapture = ui.Button.new(captureParent)
+    self.dragCapture:SetSize(0, 0, 1.0, 1.0)
+    self.dragCapture.clickthrough = false
+    self.dragCapture.alpha = 0
+    self.dragCapture.text.content = ""
+    Cursor.apply(self.dragCapture, config.Cursor.CURSOR_USE, true)
+    self.dragCapture:MoveToFront()
+    self.dragCapture:Subscribe(ui.Hook.ONHOLD, function() return self:_MoveDrag() end)
+    self.dragCapture:Subscribe(ui.Hook.ONDRAG, function() return self:_MoveDrag() end)
+    self.dragCapture:Subscribe(ui.Hook.ONRELEASE, function() return self:_StopDrag() end)
+    self.dragCapture:Subscribe(ui.Hook.ONDRAGCOMPLETE, function() return self:_StopDrag() end)
+    return false
+end
+
+function Panel:_StopDrag()
+    self.dragState = nil
+    if self.dragCapture then
+        self.dragCapture:Destroy()
+        self.dragCapture = nil
+    end
+    return false
+end
+
+function Panel:_UpdateFlowHeight()
+    local height = self.poppedOut and 0 or self.height
+    if self.flowOwner then
+        Layout.resize(self.flowOwner, self, height)
+    elseif not self.poppedOut then
+        self.dock.root:SetHeight(height)
+    end
+end
+
+function Panel:BindFlow(owner)
+    self.flowOwner = owner
+    self:_UpdateFlowHeight()
+    return self
+end
+
+function Panel:SetPoppedOut(poppedOut, notify)
+    local previous = self.poppedOut
+    self.poppedOut = self._canPopout and poppedOut == true
+    self.dock.root.hidden = self.poppedOut
+    self.overlay.root.hidden = not self.poppedOut
+    self:_UpdateFlowHeight()
+    if self.poppedOut then self.overlay.root:MoveToFront() end
+    self:_SetAltDragActive(isAltDown())
+    if notify ~= false and previous ~= self.poppedOut and self.onPopoutChange then
+        self.onPopoutChange(self, self.poppedOut)
+    end
+end
+
+function Panel:TogglePopout()
+    self:SetPoppedOut(not self.poppedOut)
+end
+
+function Panel:SetPopoutClickthrough(clickthrough)
+    self.popoutClickthrough = clickthrough == true
+    self.overlay.root.clickthrough = self.popoutClickthrough
+    self.overlay.background.clickthrough = self.popoutClickthrough
+    self.overlay.content.clickthrough = self.popoutClickthrough
+    self.overlay.content.enabled = not self.popoutClickthrough
+end
+
+function Panel:SetPopoutBackgroundAlpha(alpha)
+    self.popoutBackgroundAlpha = clampAlpha(alpha)
+    self.overlay.background.alpha = self.popoutBackgroundAlpha
+end
+
+function Panel:SetSize(width, height)
+    self.width = math.max(BORDER_SIZE * 2 + 1, math.floor(width))
+    self.height = math.max(BORDER_SIZE * 2 + 1, math.floor(height))
+    self.contentWidth = self.width - BORDER_SIZE * 2
+    self.dock.root:SetWidth(self.width)
+    self.overlay.root:SetSize(self.width, self.height)
+    self:_UpdateFlowHeight()
+    self.dockOwner.contentWidth = self.contentWidth
+    self.overlayOwner.contentWidth = self.contentWidth
+end
+
+function Panel:AddText(value)
+    return pairObjects(self, Text.append(self.dockOwner, value, false), Text.append(self.overlayOwner, value, false))
+end
+
+function Panel:AddTitle(value)
+    return pairObjects(self, Text.append(self.dockOwner, value, true), Text.append(self.overlayOwner, value, true))
+end
+
+function Panel:AddSpinner(options)
+    local dockOptions = Layout.place(self.dockOwner, options, { width = 29, height = 29 })
+    local overlayOptions = Layout.place(self.overlayOwner, options, { width = 29, height = 29 })
+    return pairObjects(self,
+        Layout.manage(self.dockOwner, Spinner.new(self.dock.content, dockOptions), dockOptions),
+        Layout.manage(self.overlayOwner, Spinner.new(self.overlay.content, overlayOptions), overlayOptions))
+end
+
+function Panel:AddBigSpinner(options)
+    local dockOptions = Layout.place(self.dockOwner, options, { width = 72, height = 72 })
+    local overlayOptions = Layout.place(self.overlayOwner, options, { width = 72, height = 72 })
+    return pairObjects(self,
+        Layout.manage(self.dockOwner, BigSpinner.new(self.dock.content, dockOptions), dockOptions),
+        Layout.manage(self.overlayOwner, BigSpinner.new(self.overlay.content, overlayOptions), overlayOptions))
+end
+
+function Panel:AddDivider(options)
+    local dockOptions = Layout.place(self.dockOwner, Divider.flowOptions(options), { width = 0, height = 60, fillWidth = true })
+    local overlayOptions = Layout.place(self.overlayOwner, Divider.flowOptions(options), { width = 0, height = 60, fillWidth = true })
+    return pairObjects(self,
+        Layout.manage(self.dockOwner, Divider.new(self.dock.content, dockOptions), dockOptions),
+        Layout.manage(self.overlayOwner, Divider.new(self.overlay.content, overlayOptions), overlayOptions))
+end
+
+function Panel:AddItemSlot(object, options)
+    local dockOptions = Layout.place(self.dockOwner, options, { width = 40, height = 40 })
+    local overlayOptions = Layout.place(self.overlayOwner, options, { width = 40, height = 40 })
+    return pairObjects(self,
+        Layout.manage(self.dockOwner, ItemSlot.new(self.dock.content, object, dockOptions), dockOptions),
+        Layout.manage(self.overlayOwner, ItemSlot.new(self.overlay.content, object, overlayOptions), overlayOptions))
+end
+
+function Panel:AddItemGrid(objects, options)
+    local width, height = ItemGrid.getSize(options)
+    local dockOptions = Layout.place(self.dockOwner, options, { width = width, height = height })
+    local overlayOptions = Layout.place(self.overlayOwner, options, { width = width, height = height })
+    return pairObjects(self,
+        Layout.manage(self.dockOwner, ItemGrid.new(self.dock.content, objects, dockOptions), dockOptions),
+        Layout.manage(self.overlayOwner, ItemGrid.new(self.overlay.content, objects, overlayOptions), overlayOptions))
+end
+
+function Panel:AddTabs(tabs, options)
+    local width, height = Tabs.getSize(tabs, options)
+    local proxy
+    local syncing = false
+
+    local function placedOptions(owner)
+        local copied = Tabs.flowOptions(options)
+        copied.onChange = function(_, index, value)
+            if syncing then return end
+            syncing = true
+            proxy.dock:SetActive(index, false)
+            proxy.overlay:SetActive(index, false)
+            syncing = false
+            if options and options.onChange then
+                options.onChange(proxy, index, value, proxy:GetPage(index))
+            end
+        end
+        return Layout.place(owner, copied, { width = width, height = height, fillWidth = true })
+    end
+
+    local dockOptions = placedOptions(self.dockOwner)
+    local overlayOptions = placedOptions(self.overlayOwner)
+    proxy = pairObjects(self,
+        Layout.manage(self.dockOwner, Tabs.new(self.dock.content, tabs, dockOptions), dockOptions),
+        Layout.manage(self.overlayOwner, Tabs.new(self.overlay.content, tabs, overlayOptions), overlayOptions))
+    return proxy
+end
+
+function Panel:AddCollapseButton(text, options)
+    local width, height = CollapseButton.getSize(text, options)
+    local dockOptions = Layout.place(self.dockOwner, options, { width = width, height = height, fillWidth = true })
+    local overlayOptions = Layout.place(self.overlayOwner, options, { width = width, height = height, fillWidth = true })
+    local dock = Layout.manage(self.dockOwner, CollapseButton.new(self.dock.content, text, dockOptions), dockOptions)
+    local overlay = Layout.manage(self.overlayOwner, CollapseButton.new(self.overlay.content, text, overlayOptions), overlayOptions)
+    dock:BindFlow(self.dockOwner)
+    overlay:BindFlow(self.overlayOwner)
+    return pairObjects(self, dock, overlay)
+end
+
+local function selectionOptions(panel, options, proxyReference)
+    local copied = copyOptions(options)
+    if copied.onChange then
+        local onChange = copied.onChange
+        copied.onChange = function(_, ...)
+            onChange(proxyReference(), ...)
+        end
+    end
+    return copied
+end
+
+function Panel:AddRadioButton(choices, options)
+    local proxy
+    local dockOptions = selectionOptions(self, options, function() return proxy end)
+    local overlayOptions = selectionOptions(self, options, function() return proxy end)
+    local width, height = RadioButton.getSize(choices, options)
+    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = width, height = height, fillWidth = true })
+    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = width, height = height, fillWidth = true })
+    local dock = Layout.manage(self.dockOwner, RadioButton.new(self.dock.content, choices, dockOptions), dockOptions)
+    local overlay = Layout.manage(self.overlayOwner, RadioButton.new(self.overlay.content, choices, overlayOptions), overlayOptions)
+    proxy = pairObjects(self, dock, overlay)
+    return proxy
+end
+
+function Panel:AddCheckboxButton(choices, options)
+    local proxy
+    local dockOptions = selectionOptions(self, options, function() return proxy end)
+    local overlayOptions = selectionOptions(self, options, function() return proxy end)
+    local width, height = CheckboxButton.getSize(choices, options)
+    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = width, height = height, fillWidth = true })
+    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = width, height = height, fillWidth = true })
+    local dock = Layout.manage(self.dockOwner, CheckboxButton.new(self.dock.content, choices, dockOptions), dockOptions)
+    local overlay = Layout.manage(self.overlayOwner, CheckboxButton.new(self.overlay.content, choices, overlayOptions), overlayOptions)
+    proxy = pairObjects(self, dock, overlay)
+    return proxy
+end
+
+function Panel:AddTextField(options)
+    options = options or {}
+    local proxy
+    local syncing = false
+    local width, height = TextField.getSize(options)
+    local function placed(owner, other)
+        local copied = copyOptions(options)
+        copied.onChange = function(_, reason, content)
+            if syncing then return end
+            syncing = true
+            if other() then other():SetText(content, false) end
+            syncing = false
+            if options.onChange then options.onChange(proxy, reason, content) end
+            if options.onSubmit and reason == ui.InputFieldActionResult.SUBMIT then
+                options.onSubmit(proxy, content)
+            end
+        end
+        copied.onSubmit = nil
+        return Layout.place(owner, copied, { width = width, height = height, fillWidth = true })
+    end
+    local dock, overlay
+    local dockOptions = placed(self.dockOwner, function() return overlay end)
+    local overlayOptions = placed(self.overlayOwner, function() return dock end)
+    dock = Layout.manage(self.dockOwner, TextField.new(self.dock.content, dockOptions), dockOptions)
+    overlay = Layout.manage(self.overlayOwner, TextField.new(self.overlay.content, overlayOptions), overlayOptions)
+    proxy = pairObjects(self, dock, overlay)
+    rawset(proxy, "SetText", function(_, value, notify)
+        local content = tostring(value or "")
+        syncing = true
+        dock:SetText(content, false)
+        overlay:SetText(content, false)
+        syncing = false
+        if notify == true and options.onChange then
+            options.onChange(proxy, ui.InputFieldActionResult.CONTENT_CHANGE, content)
+        end
+    end)
+    return proxy
+end
+
+function Panel:AddComboBox(options)
+    options = options or {}
+    local proxy
+    local syncing = false
+    local width, height = ComboBox.getSize(options)
+    local function placed(owner, other)
+        local copied = copyOptions(options)
+        copied.onChange = function(_, entryID, label, eventType)
+            if syncing then return end
+            syncing = true
+            if other() then other():Select(entryID, false) end
+            syncing = false
+            if options.onChange then options.onChange(proxy, entryID, label, eventType) end
+        end
+        return Layout.place(owner, copied, { width = width, height = height, fillWidth = true })
+    end
+    local dock, overlay
+    local dockOptions = placed(self.dockOwner, function() return overlay end)
+    local overlayOptions = placed(self.overlayOwner, function() return dock end)
+    dock = Layout.manage(self.dockOwner, ComboBox.new(self.dock.content, dockOptions), dockOptions)
+    overlay = Layout.manage(self.overlayOwner, ComboBox.new(self.overlay.content, overlayOptions), overlayOptions)
+    proxy = pairObjects(self, dock, overlay)
+    rawset(proxy, "Select", function(_, entryID, notify)
+        syncing = true
+        local dockResult = dock:Select(entryID, false)
+        local overlayResult = overlay:Select(entryID, false)
+        syncing = false
+        if notify == true and options.onChange then
+            local active = self.poppedOut and overlay or dock
+            options.onChange(proxy, entryID, active:GetSelectedLabel(), ui.SelectionChangeEvent.SELECTED)
+        end
+        return self.poppedOut and overlayResult or dockResult
+    end)
+    return proxy
+end
+
+function Panel:AddList(options)
+    options = options or {}
+    local proxy
+    local syncing = false
+    local width, height = List.getSize(options)
+    local function placed(owner, other)
+        local copied = copyOptions(options)
+        copied.onChange = function(_, entryID, selected, eventType)
+            if syncing then return end
+            syncing = true
+            if other() then other():SetSelected(entryID, selected, false) end
+            syncing = false
+            if options.onChange then options.onChange(proxy, entryID, selected, eventType) end
+        end
+        return Layout.place(owner, copied, { width = width, height = height, fillWidth = true })
+    end
+    local dock, overlay
+    local dockOptions = placed(self.dockOwner, function() return overlay end)
+    local overlayOptions = placed(self.overlayOwner, function() return dock end)
+    dock = Layout.manage(self.dockOwner, List.new(self.dock.content, dockOptions), dockOptions)
+    overlay = Layout.manage(self.overlayOwner, List.new(self.overlay.content, overlayOptions), overlayOptions)
+    proxy = pairObjects(self, dock, overlay)
+    rawset(proxy, "SetSelected", function(_, entryID, selected, notify)
+        syncing = true
+        local dockResult = dock:SetSelected(entryID, selected, false)
+        local overlayResult = overlay:SetSelected(entryID, selected, false)
+        syncing = false
+        if notify == true and options.onChange then
+            options.onChange(
+                proxy,
+                entryID,
+                selected == true,
+                selected and ui.SelectionChangeEvent.SELECTED or ui.SelectionChangeEvent.DESELECTED
+            )
+        end
+        return self.poppedOut and overlayResult or dockResult
+    end)
+    return proxy
+end
+
+local function actionOptions(options, action, proxyReference)
+    if action == nil then return nil, copyOptions(options) end
+    return function(_, ...)
+        action(proxyReference(), ...)
+    end, copyOptions(options)
+end
+
+function Panel:AddRibbonButton(spriteID, action, options)
+    local proxy
+    local dockAction, dockOptions = actionOptions(options, action, function() return proxy end)
+    local overlayAction, overlayOptions = actionOptions(options, action, function() return proxy end)
+    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = 32, height = 32 })
+    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = 32, height = 32 })
+    local dock = Layout.manage(self.dockOwner, RibbonButton.new(self.dock.content, spriteID, dockAction, dockOptions), dockOptions)
+    local overlay = Layout.manage(self.overlayOwner, RibbonButton.new(self.overlay.content, spriteID, overlayAction, overlayOptions), overlayOptions)
+    proxy = pairObjects(self, dock, overlay)
+    return proxy
+end
+
+function Panel:AddSimpleButton(content, action, options)
+    local proxy
+    local dockAction, dockOptions = actionOptions(options, action, function() return proxy end)
+    local overlayAction, overlayOptions = actionOptions(options, action, function() return proxy end)
+    local width, height = SimpleButton.getSize(content, options)
+    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = width, height = height })
+    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = width, height = height })
+    local dock = Layout.manage(self.dockOwner, SimpleButton.new(self.dock.content, content, dockAction, dockOptions), dockOptions)
+    local overlay = Layout.manage(self.overlayOwner, SimpleButton.new(self.overlay.content, content, overlayAction, overlayOptions), overlayOptions)
+    proxy = pairObjects(self, dock, overlay)
+    return proxy
+end
+
+function Panel:AddSlider(options)
+    local proxy
+    local syncing = false
+    local function placedOptions(owner)
+        local copied = copyOptions(options)
+        copied.onChange = function(_, value)
+            if syncing then return end
+            syncing = true
+            proxy.dock:SetValue(value, false)
+            proxy.overlay:SetValue(value, false)
+            syncing = false
+            if options and options.onChange then options.onChange(proxy, value) end
+        end
+        local width, height = Slider.getSize(copied)
+        return Layout.place(owner, copied, { width = width, height = height, fillWidth = true })
+    end
+    local dockOptions = placedOptions(self.dockOwner)
+    local overlayOptions = placedOptions(self.overlayOwner)
+    proxy = pairObjects(self,
+        Layout.manage(self.dockOwner, Slider.new(self.dock.content, dockOptions), dockOptions),
+        Layout.manage(self.overlayOwner, Slider.new(self.overlay.content, overlayOptions), overlayOptions))
+    return proxy
+end
+
+function Panel:AddFancyButton(text, action, options)
+    local proxy
+    local dockAction, dockOptions = actionOptions(options, action, function() return proxy end)
+    local overlayAction, overlayOptions = actionOptions(options, action, function() return proxy end)
+    local width, height = FancyButton.getSize(text, options)
+    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = width, height = height })
+    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = width, height = height })
+    local dock = Layout.manage(self.dockOwner, FancyButton.new(self.dock.content, text, dockAction, dockOptions), dockOptions)
+    local overlay = Layout.manage(self.overlayOwner, FancyButton.new(self.overlay.content, text, overlayAction, overlayOptions), overlayOptions)
+    proxy = pairObjects(self, dock, overlay)
+    return proxy
+end
+
+function Panel:AddSpriteButton(spriteName, action, options)
+    local proxy
+    local dockAction, dockOptions = actionOptions(options, action, function() return proxy end)
+    local overlayAction, overlayOptions = actionOptions(options, action, function() return proxy end)
+    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = 24, height = 24 })
+    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = 24, height = 24 })
+    local dock = Layout.manage(self.dockOwner, SpriteButton.new(self.dock.content, spriteName, dockAction, dockOptions), dockOptions)
+    local overlay = Layout.manage(self.overlayOwner, SpriteButton.new(self.overlay.content, spriteName, overlayAction, overlayOptions), overlayOptions)
+    proxy = pairObjects(self, dock, overlay)
+    return proxy
+end
+
+function Panel:Destroy()
+    Event.Logic.Unsubscribe(self.dragEventID)
+    self:_StopDrag()
+    Layout.destroyManaged(self.dockOwner)
+    Layout.destroyManaged(self.overlayOwner)
+    if self.dock and self.dock.content then Tooltip.unregisterContext(self.dock.content) end
+    if self.overlay and self.overlay.content then Tooltip.unregisterContext(self.overlay.content) end
+    if self.dockTooltip then self.dockTooltip:Destroy() self.dockTooltip = nil end
+    if self.overlayTooltip then self.overlayTooltip:Destroy() self.overlayTooltip = nil end
+    if self.dock and self.dock.root then self.dock.root:Destroy() end
+    if self.overlay and self.overlay.root then self.overlay.root:Destroy() end
+    self.root = nil
+    self.content = nil
+    self.overlayContent = nil
+    self.flowOwner = nil
+end
+
+return Panel

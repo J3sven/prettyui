@@ -1,0 +1,113 @@
+local Palette = require("src/core/control_palette")
+local Tooltip = require("src/tooltip")
+local Wheel = require("src/core/wheel")
+
+local TextField = {}
+TextField.__index = TextField
+
+local DEFAULT_WIDTH = 240
+local DEFAULT_HEIGHT = 30
+local DEFAULT_TEXT_COLOUR = Palette.TEXT
+local DEFAULT_PLACEHOLDER_COLOUR = 0x99958DFF
+local INPUT_MARGIN = 8
+local defaultInputSprite = nil
+
+function TextField.SetDefaultSprite(sprite)
+    defaultInputSprite = sprite
+end
+
+function TextField.getSize(options)
+    options = options or {}
+    return options.width or DEFAULT_WIDTH, options.height or DEFAULT_HEIGHT
+end
+
+function TextField.new(parent, options)
+    options = options or {}
+    local self = setmetatable({}, TextField)
+    self.onChange = options.onChange
+    self.onSubmit = options.onSubmit
+    self.disabled = options.disabled == true
+
+    self.root = ui.InputField.new(parent)
+    self.root.stylesheetID = options.stylesheetID or id.StyleSheet.INPUT_DEFAULT
+    self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
+    self.root:SetSize(
+        options.width or DEFAULT_WIDTH,
+        options.height or DEFAULT_HEIGHT,
+        options.widthAnchor or 0,
+        options.heightAnchor or 0
+    )
+    self.root:Setup(
+        options.visibility or ui.TextContentVisibilityMode.VISIBLE,
+        options.filterMode or options.filter or ui.InputFieldFilterMode.NONE,
+        options.maxLength or 0
+    )
+    self.root.inputMode = options.inputMode or ui.InputFieldKeyHandlingMode.DEFAULT
+    self.root.emptyText = options.placeholder or options.emptyText or ""
+    self.root.content = tostring(options.text or options.content or "")
+    self.root.contentMargin = options.contentMargin or ui.Margin.new(8, 0, 8, 0)
+    self.root.text.font = options.font or id.Font.MUSEO_SANS_15PT_REGULAR
+    self.root.text.rgba = options.colour or options.color or DEFAULT_TEXT_COLOUR
+    self.root.text.isShadowed = options.shadowed ~= false
+    self.root.emptyTextRGBA = options.placeholderColour or options.placeholderColor or DEFAULT_PLACEHOLDER_COLOUR
+    self.root.caretRGBA = options.caretColour or options.caretColor or Palette.CARET
+    self.root.selectionHighlightRGBA = options.selectionColour
+        or options.selectionColor
+        or Palette.SELECTED
+    self.root.enabled = not self.disabled
+    self.root.clickthrough = self.disabled
+    Wheel.bind(self.root, options)
+
+    local backgroundSprite = options.inputSprite or defaultInputSprite
+    if backgroundSprite then
+        self.root.containerSprite.sprite = backgroundSprite
+        self.root.containerSprite.visualMargins = ui.Margin.new(INPUT_MARGIN)
+        self.root.containerSprite.isTiling = true
+    end
+
+    self.root:Subscribe(ui.Hook.ONCONTENTCHANGED, function(_, reason, content)
+        if self._suppressCallbacks then return false end
+        if self.onChange then self.onChange(self, reason, content) end
+        if self.onSubmit and reason == ui.InputFieldActionResult.SUBMIT then
+            self.onSubmit(self, content)
+        end
+        return false
+    end)
+
+    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    return self
+end
+
+function TextField:GetText()
+    return self.root and self.root.content or ""
+end
+
+function TextField:SetText(value, triggerCallback)
+    if not self.root then return end
+    local content = tostring(value or "")
+    self._suppressCallbacks = true
+    self.root.content = content
+    self._suppressCallbacks = false
+    if triggerCallback == true and self.onChange then
+        self.onChange(self, ui.InputFieldActionResult.CONTENT_CHANGE, content)
+    end
+end
+
+function TextField:SetPlaceholder(value)
+    if self.root then self.root.emptyText = tostring(value or "") end
+end
+
+function TextField:SetDisabled(disabled)
+    self.disabled = disabled == true
+    if self.root then
+        self.root.enabled = not self.disabled
+        self.root.clickthrough = self.disabled
+    end
+end
+
+function TextField:Destroy()
+    if self.tooltip then self.tooltip:Destroy() self.tooltip = nil end
+    if self.root then self.root:Destroy() self.root = nil end
+end
+
+return TextField
