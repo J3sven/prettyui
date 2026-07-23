@@ -213,7 +213,7 @@ Sprites.SPRITE_BUTTONS = {
     LADDER_DOWN = { disabled = id.Sprite.RS3_ICON_DIRECTION_DESCEND_32PX_4, neutral = id.Sprite.RS3_ICON_DIRECTION_DESCEND_32PX_2, active = id.Sprite.RS3_ICON_DIRECTION_DESCEND_32PX_3 },
     ARROW_UP = { disabled = id.Sprite.RS3_ICON_DIRECTION_UP_32PX_4, neutral = id.Sprite.RS3_ICON_DIRECTION_UP_32PX_2, active = id.Sprite.RS3_ICON_DIRECTION_UP_32PX_3 },
     ARROW_RIGHT = { disabled = id.Sprite.RS3_ICON_DIRECTION_RIGHT_32PX_4, neutral = id.Sprite.RS3_ICON_DIRECTION_RIGHT_32PX_2, active = id.Sprite.RS3_ICON_DIRECTION_RIGHT_32PX_3 },
-    ARROW_LEFT = { disabled = id.Sprite.RS3_ICON_DIRECTION_LEFT_32PX_4, neutral = id.Sprite.RS3_ICON_DIRECTION_LEFT_32PX_3, active = id.Sprite.RS3_ICON_DIRECTION_LEFT_32PX_2 },
+    ARROW_LEFT = { disabled = id.Sprite.RS3_ICON_DIRECTION_LEFT_32PX_4, neutral = id.Sprite.RS3_ICON_DIRECTION_LEFT_32PX_2, active = id.Sprite.RS3_ICON_DIRECTION_LEFT_32PX_3 },
     ARROW_DOWN = { disabled = id.Sprite.RS3_ICON_DIRECTION_DOWN_32PX_4, neutral = id.Sprite.RS3_ICON_DIRECTION_DOWN_32PX_2, active = id.Sprite.RS3_ICON_DIRECTION_DOWN_32PX_3 },
     SEARCH = { disabled = id.Sprite.TRH_ICON_SEARCH_QUERY_2, neutral = id.Sprite.TRH_ICON_SEARCH_QUERY_0, active = id.Sprite.TRH_ICON_SEARCH_QUERY_1 },
     CHAT = { disabled = id.Sprite.CHAT_V2_SETTINGS_OFF_2, neutral = id.Sprite.CHAT_V2_SETTINGS_ON_2, active = id.Sprite.CHAT_V2_SETTINGS_OVER_2 },
