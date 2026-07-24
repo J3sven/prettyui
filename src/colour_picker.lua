@@ -427,7 +427,11 @@ function ColourPicker:Open()
         self.colour
     )
     self.previewButton.content = self.preview
-    self.previewButton.root.enabled = false
+    self.previewButton:SetHoverCursor(nil)
+    self.previewButton.root:Unsubscribe(ui.Hook.ONMOUSEOVER)
+    self.previewButton.root:Unsubscribe(ui.Hook.ONMOUSELEAVE)
+    self.previewButton.root:Unsubscribe(ui.Hook.ONCLICK)
+    self.previewButton.root:Unsubscribe(ui.Hook.ONRELEASE)
     self.previewButton.root.clickthrough = true
 
     self.fieldHit = ui.Layer.new(picker.content)
