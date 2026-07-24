@@ -27,8 +27,10 @@ end
 
 function Layout.configure(owner, options)
     options = options or {}
+    local startY = options.startY or DEFAULT_START_Y
     owner._flowLayout = {
-        nextY = options.startY or DEFAULT_START_Y,
+        startY = startY,
+        nextY = startY,
         paddingLeft = options.paddingLeft or options.padding or DEFAULT_PADDING,
         paddingRight = options.paddingRight or options.padding or DEFAULT_PADDING,
         paddingBottom = options.paddingBottom or options.padding or DEFAULT_PADDING,
@@ -36,6 +38,7 @@ function Layout.configure(owner, options)
         rowGap = options.rowGap or DEFAULT_ROW_GAP,
         row = nil,
         hasItems = false,
+        minimumContentHeight = owner.contentHeight or 0,
     }
     owner._managedFlowComponents = {}
     owner._managedFlowEntries = {}
@@ -52,9 +55,11 @@ function Layout.place(owner, value, defaults)
     local height = options.height or options.size or defaults.height or 0
     local gap = options.marginBottom
     if gap == nil then gap = defaults.gap or layout.rowGap end
+    options._flowGap = gap
 
     local absolute = options.absolute == true or options.y ~= nil
     options._flowAbsolute = absolute
+    options._flowExplicitX = options.x ~= nil
     if absolute then
         options.x = options.x or layout.paddingLeft
         options.y = options.y or layout.nextY
@@ -72,6 +77,7 @@ function Layout.place(owner, value, defaults)
         end
         options.x = options.x or layout.paddingLeft
         options.y = layout.nextY + marginTop
+        options._flowMarginTop = marginTop
         layout.row = {
             y = options.y,
             height = height,
@@ -97,7 +103,20 @@ end
 
 function Layout.manage(owner, component, placement)
     table.insert(owner._managedFlowComponents, component)
-    return Layout.track(owner, component, placement)
+    Layout.track(owner, component, placement)
+
+    -- Component:Destroy() removes the native UI object, but the flow layout also
+    -- needs to forget its row. Decorate managed Lua components so callers do not
+    -- need a separate layout cleanup operation.
+    if type(component) == "table" and type(component.Destroy) == "function" then
+        local destroy = component.Destroy
+        component.Destroy = function(self, ...)
+            if owner._destroyingManagedFlow ~= true then Layout.remove(owner, self) end
+            return destroy(self, ...)
+        end
+    end
+
+    return component
 end
 
 function Layout.track(owner, component, placement)
@@ -110,6 +129,83 @@ end
 
 local function componentRoot(component)
     return component and (component.root or component) or nil
+end
+
+local function setFlowPosition(root, placement, x, y)
+    root:SetPos(x, y, placement.xAnchor or 0, placement.yAnchor or 0)
+end
+
+local function reflow(owner)
+    local layout = owner._flowLayout
+    if layout == nil then return end
+
+    layout.nextY = layout.startY
+    layout.row = nil
+    layout.hasItems = false
+    local contentBottom = layout.startY
+    for _, entry in ipairs(owner._managedFlowEntries or {}) do
+        local root = componentRoot(entry.component)
+        local placement = entry.placement
+        if root ~= nil then
+            local height = root.height or placement.height or 0
+            local width = root.width or placement.width or placement.size or 0
+            local gap = placement._flowGap or layout.rowGap
+
+            if placement._flowAbsolute == true then
+                contentBottom = math.max(contentBottom, (root.y or placement.y or 0) + height)
+            elseif placement.inline == true and layout.row ~= nil then
+                local x = placement._flowExplicitX and placement.x or layout.row.nextX
+                local y = layout.row.y + (placement.offsetY or 0)
+                setFlowPosition(root, placement, x, y)
+                layout.row.height = math.max(layout.row.height, (placement.offsetY or 0) + height)
+                layout.row.gap = math.max(layout.row.gap, gap)
+                layout.row.nextX = x + math.max(0, width) +
+                    (placement.columnGap or layout.columnGap)
+                contentBottom = math.max(contentBottom, y + height)
+            else
+                finalizeRow(layout)
+                local marginTop = placement._flowMarginTop or 0
+                local x = placement._flowExplicitX and placement.x or layout.paddingLeft
+                local y = layout.nextY + marginTop
+                setFlowPosition(root, placement, x, y)
+                layout.row = {
+                    y = y,
+                    height = height,
+                    gap = gap,
+                    nextX = x + math.max(0, width) +
+                        (placement.columnGap or layout.columnGap),
+                }
+                layout.hasItems = true
+                contentBottom = math.max(contentBottom, y + height)
+            end
+        end
+    end
+
+    if owner.SetContentHeight then
+        owner:SetContentHeight(math.max(
+            layout.minimumContentHeight,
+            contentBottom + layout.paddingBottom
+        ))
+    end
+end
+
+function Layout.remove(owner, component)
+    local removed = false
+    local entries = owner._managedFlowEntries or {}
+    for index = #entries, 1, -1 do
+        if entries[index].component == component then
+            table.remove(entries, index)
+            removed = true
+        end
+    end
+
+    local components = owner._managedFlowComponents or {}
+    for index = #components, 1, -1 do
+        if components[index] == component then table.remove(components, index) end
+    end
+
+    if removed then reflow(owner) end
+    return removed
 end
 
 function Layout.resize(owner, component, height)
@@ -148,10 +244,12 @@ end
 
 function Layout.destroyManaged(owner)
     local components = owner._managedFlowComponents or {}
+    owner._destroyingManagedFlow = true
     for index = #components, 1, -1 do
         local component = components[index]
         if component and component.Destroy then component:Destroy() end
     end
+    owner._destroyingManagedFlow = nil
     owner._managedFlowComponents = {}
     owner._managedFlowEntries = {}
 end
