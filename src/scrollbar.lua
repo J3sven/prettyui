@@ -41,6 +41,14 @@ local function sprite(parent, spriteID)
     return component
 end
 
+local function findOwnerWindow(context)
+    while context do
+        if context.ownerWindow then return context.ownerWindow end
+        context = context.parentContext
+    end
+    return nil
+end
+
 function Scrollbar.new(parent, options)
     options = options or {}
 
@@ -69,7 +77,8 @@ function Scrollbar.new(parent, options)
     self.content:SetSize(self.contentWidth, self.contentHeight)
     local parentTooltipContext = Tooltip.getContext(parent)
     local tooltipParent = parentTooltipContext and parentTooltipContext.parent or parent
-    self.overlayContext = parentTooltipContext
+    self.ownerWindow = findOwnerWindow(parentTooltipContext)
+    self.overlayContext = self.ownerWindow and parentTooltipContext or nil
     self.tooltipContext = Tooltip.registerContext(self.content, tooltipParent, function(target)
         local rootX = self.root.x or 0
         local rootY = self.root.y or 0
@@ -124,9 +133,16 @@ function Scrollbar.new(parent, options)
     self.thumbBottom:SetPos(0, -END_SIZE, 0, 1.0)
     self.thumbBottom:SetSize(BAR_WIDTH, END_SIZE)
 
-    self.thumbDrag = ui.Layer.new(tooltipParent)
+    self.thumbDrag = ui.Layer.new(self.overlayContext and tooltipParent or parent)
     self.thumbDrag.clickthrough = false
     self.thumbDrag:MoveToFront()
+    if self.ownerWindow then
+        self.ownerWindow:_RegisterOverlay(self.thumbDrag, function()
+            return self.scrollbarVisible
+        end, function()
+            self:_LayoutThumbDrag()
+        end)
+    end
 
     self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function()
         local mouse = Mouse.GetPosition()
@@ -183,7 +199,8 @@ function Scrollbar:_LayoutThumb()
     self.track.hidden = not self.scrollbarVisible
     self.upArrow.hidden = not self.scrollbarVisible
     self.downArrow.hidden = not self.scrollbarVisible
-    self.thumbDrag.hidden = not self.scrollbarVisible
+    self.thumbDrag.hidden = not self.scrollbarVisible or
+        (self.ownerWindow and self.ownerWindow.root and self.ownerWindow.root.hidden == true)
 end
 
 function Scrollbar:SetScrollPosition(position)
@@ -391,6 +408,7 @@ function Scrollbar:Destroy()
         self.tooltip = nil
     end
     if self.thumbDrag then
+        if self.ownerWindow then self.ownerWindow:_UnregisterOverlay(self.thumbDrag) end
         self.thumbDrag:Destroy()
         self.thumbDrag = nil
     end
@@ -399,6 +417,7 @@ function Scrollbar:Destroy()
         self.root = nil
     end
     self.overlayContext = nil
+    self.ownerWindow = nil
 end
 
 return Scrollbar

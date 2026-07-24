@@ -62,6 +62,7 @@ function Window.new(parent, options)
     self.maxWidth = options.maxWidth
     self.maxHeight = options.maxHeight
     self.interfaceScaleSetting = game.options.InterfaceScale.setting
+    self.overlays = {}
 
     self.root = ui.Layer.new(parent)
     self.root.clickthrough = false
@@ -160,6 +161,7 @@ function Window.new(parent, options)
             dragStart = nil
             self.titleDrag:SetPos(self.root.x, self.root.y)
             self.titleDrag:SetSize(self.root.width - CLOSE_SIZE - 14, TITLE_HEIGHT)
+            self:_SyncOverlays(false)
             return false
         end
 
@@ -252,6 +254,7 @@ function Window:SetSize(width, height)
         clamp(math.floor(height), self.minHeight, self.maxHeight)
     )
     self.contentWidth = self.root.width - BORDER * 2
+    self:_SyncOverlays(self.root.hidden == true)
 end
 
 function Window:SetTitle(title)
@@ -381,6 +384,23 @@ function Window:AddSpriteButton(spriteName, action, options)
     return Layout.manage(self, SpriteButton.new(self.content, spriteName, action, placed), placed)
 end
 
+function Window:_RegisterOverlay(component, isVisible, layout)
+    self.overlays[component] = { isVisible = isVisible, layout = layout }
+end
+
+function Window:_UnregisterOverlay(component)
+    self.overlays[component] = nil
+end
+
+function Window:_SyncOverlays(hidden)
+    for component, overlay in pairs(self.overlays) do
+        if not hidden and overlay.layout then overlay.layout() end
+        component.hidden = hidden or
+            (overlay.isVisible and not overlay.isVisible() or false)
+        if not component.hidden then component:MoveToFront() end
+    end
+end
+
 function Window:Show()
     self.root.hidden = false
     self.root:MoveToFront()
@@ -388,6 +408,7 @@ function Window:Show()
         self.titleDrag.hidden = false
         self.titleDrag:MoveToFront()
     end
+    self:_SyncOverlays(false)
 end
 
 function Window:Close()
@@ -397,10 +418,12 @@ function Window:Close()
     else
         self.root.hidden = true
         if self.titleDrag then self.titleDrag.hidden = true end
+        self:_SyncOverlays(true)
     end
 end
 
 function Window:Destroy()
+    self:_SyncOverlays(true)
     Layout.destroyManaged(self)
     if self.content then
         Tooltip.unregisterContext(self.content)
@@ -418,6 +441,7 @@ function Window:Destroy()
         self.titleDrag:Destroy()
         self.titleDrag = nil
     end
+    self.overlays = {}
 end
 
 return Window
