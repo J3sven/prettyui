@@ -1,7 +1,6 @@
 local Sprites = require("src/core/sprites")
 local BigSpinner = require("src/big_spinner")
 local CheckboxButton = require("src/checkbox_button")
-local ColourPicker = require("src/colour_picker")
 local ComboBox = require("src/combo_box")
 local CollapseButton = require("src/collapse_button")
 local Cursor = require("src/core/cursor")
@@ -596,42 +595,6 @@ function Panel:AddCheckboxButton(choices, options)
     local dock = Layout.manage(self.dockOwner, CheckboxButton.new(self.dock.content, choices, dockOptions), dockOptions)
     local overlay = Layout.manage(self.overlayOwner, CheckboxButton.new(self.overlay.content, choices, overlayOptions), overlayOptions)
     proxy = pairObjects(self, dock, overlay)
-    return proxy
-end
-
-function Panel:AddColourPicker(options)
-    local proxy
-    local syncing = false
-    local function placedOptions(owner)
-        local copied = copyOptions(options)
-        copied.onChange = function(_, colour)
-            if syncing then return end
-            syncing = true
-            proxy.dock:SetValue(colour, false)
-            proxy.overlay:SetValue(colour, false)
-            syncing = false
-            if options and options.onChange then options.onChange(proxy, colour) end
-        end
-        local width, height = ColourPicker.getSize(copied)
-        return Layout.place(owner, copied, { width = width, height = height })
-    end
-    local dockOptions = placedOptions(self.dockOwner)
-    local overlayOptions = placedOptions(self.overlayOwner)
-    proxy = pairObjects(self,
-        Layout.manage(
-            self.dockOwner,
-            ColourPicker.new(self.dock.content, dockOptions),
-            dockOptions
-        ),
-        Layout.manage(
-            self.overlayOwner,
-            ColourPicker.new(self.overlay.content, overlayOptions),
-            overlayOptions
-        ))
-    rawset(proxy, "Open", function()
-        local active = self.poppedOut and proxy.overlay or proxy.dock
-        return active:Open()
-    end)
     return proxy
 end
 

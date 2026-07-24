@@ -1,7 +1,6 @@
 local Sprites = require("src/core/sprites")
 local BigSpinner = require("src/big_spinner")
 local CheckboxButton = require("src/checkbox_button")
-local ColourPicker = require("src/colour_picker")
 local ComboBox = require("src/combo_box")
 local CollapseButton = require("src/collapse_button")
 local Divider = require("src/divider")
@@ -144,7 +143,6 @@ function Window.new(parent, options)
             width = -48,
             height = TITLE_HEIGHT - 4,
             colour = 0xF4E4B8FF,
-            font = id.Font.CINZEL_13PT_BOLD,
             alignHorizontal = ui.AlignMode.CENTRE,
         })
 
@@ -239,7 +237,6 @@ function Window.new(parent, options)
         return rootX + (self.content.x or 0) + (target.x or 0),
             rootY + (self.content.y or 0) + (target.y or 0)
     end, parentTooltipContext)
-    self.tooltipContext.ownerWindow = self
     Layout.configure(self, options.layout or options.textLayout)
     self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
 
@@ -327,12 +324,6 @@ function Window:AddCheckboxButton(choices, options)
     local width, height = CheckboxButton.getSize(choices, options)
     local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
     return Layout.manage(self, CheckboxButton.new(self.content, choices, placed), placed)
-end
-
-function Window:AddColourPicker(options)
-    local width, height = ColourPicker.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, ColourPicker.new(self.content, placed), placed)
 end
 
 function Window:AddTextField(options)

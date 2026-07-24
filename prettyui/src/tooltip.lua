@@ -101,7 +101,6 @@ local function destroyContext(context)
     end
     context.children = {}
     context.tooltips = {}
-    context.ownerWindow = nil
 end
 
 function Tooltip.unregisterContext(collection)

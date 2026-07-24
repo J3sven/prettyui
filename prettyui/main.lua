@@ -9,7 +9,6 @@ local PrettyUI = {
     AnchoredTooltip = require("src/anchored_tooltip"),
     BigSpinner = require("src/big_spinner"),
     CheckboxButton = require("src/checkbox_button"),
-    ColourPicker = require("src/colour_picker"),
     ComboBox = require("src/combo_box"),
     CollapseButton = require("src/collapse_button"),
     Divider = require("src/divider"),

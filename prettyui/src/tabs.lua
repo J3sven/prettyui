@@ -1,6 +1,5 @@
 local BigSpinner = require("src/big_spinner")
 local CheckboxButton = require("src/checkbox_button")
-local ColourPicker = require("src/colour_picker")
 local ComboBox = require("src/combo_box")
 local CollapseButton = require("src/collapse_button")
 local Cursor = require("src/core/cursor")
@@ -489,12 +488,6 @@ function TabPage:AddCheckboxButton(choices, options)
     local width, height = CheckboxButton.getSize(choices, options)
     local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
     return Layout.manage(self, CheckboxButton.new(self.content, choices, placed), placed)
-end
-
-function TabPage:AddColourPicker(options)
-    local width, height = ColourPicker.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, ColourPicker.new(self.content, placed), placed)
 end
 
 function TabPage:AddTextField(options)
