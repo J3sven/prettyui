@@ -69,6 +69,7 @@ function Scrollbar.new(parent, options)
     self.content:SetSize(self.contentWidth, self.contentHeight)
     local parentTooltipContext = Tooltip.getContext(parent)
     local tooltipParent = parentTooltipContext and parentTooltipContext.parent or parent
+    self.overlayContext = parentTooltipContext
     self.tooltipContext = Tooltip.registerContext(self.content, tooltipParent, function(target)
         local rootX = self.root.x or 0
         local rootY = self.root.y or 0
@@ -123,7 +124,7 @@ function Scrollbar.new(parent, options)
     self.thumbBottom:SetPos(0, -END_SIZE, 0, 1.0)
     self.thumbBottom:SetSize(BAR_WIDTH, END_SIZE)
 
-    self.thumbDrag = ui.Layer.new(parent)
+    self.thumbDrag = ui.Layer.new(tooltipParent)
     self.thumbDrag.clickthrough = false
     self.thumbDrag:MoveToFront()
 
@@ -200,9 +201,14 @@ end
 
 function Scrollbar:_LayoutThumbDrag()
     if self.thumbDrag == nil or self.root == nil then return end
+    local rootX = self.root.x or 0
+    local rootY = self.root.y or 0
+    if self.overlayContext and self.overlayContext.active then
+        rootX, rootY = self.overlayContext.position(self.root)
+    end
     self.thumbDrag:SetPos(
-        (self.root.x or 0) + (self.track.x or 0) + (self.thumb.x or 0),
-        (self.root.y or 0) + (self.track.y or 0) + (self.thumb.y or 0)
+        rootX + (self.track.x or 0) + (self.thumb.x or 0),
+        rootY + (self.track.y or 0) + (self.thumb.y or 0)
     )
     self.thumbDrag:SetSize(BAR_WIDTH, self.thumbHeight)
 end
@@ -392,6 +398,7 @@ function Scrollbar:Destroy()
         self.root:Destroy()
         self.root = nil
     end
+    self.overlayContext = nil
 end
 
 return Scrollbar
