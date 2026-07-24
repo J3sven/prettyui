@@ -166,11 +166,13 @@ local function createToggle(surface, panel, popoutMode)
     return button
 end
 
-local function createDragLayer(surface, panel)
-    local layer = ui.Layer.new(surface.root)
-    layer:SetSize(0, 0, 1.0, 1.0)
+local function createDragLayer(parent, surface, panel)
+    local layer = ui.Layer.new(parent)
+    layer:SetPos(surface.root.x, surface.root.y)
+    layer:SetSize(surface.root.width, surface.root.height)
     layer.clickthrough = true
     layer.enabled = false
+    layer.hidden = true
 
     layer:Subscribe(ui.Hook.ONCLICK, function()
         if not isAltDown() then return true end
@@ -181,11 +183,7 @@ local function createDragLayer(surface, panel)
         return panel:_MoveDrag()
     end)
     layer:Subscribe(ui.Hook.ONDRAG, function()
-        return panel:_CreateDragCapture()
-    end)
-    layer:Subscribe(ui.Hook.ONMOUSELEAVE, function()
-        if panel.dragState then return panel:_CreateDragCapture() end
-        return true
+        return panel:_MoveDrag()
     end)
     layer:Subscribe(ui.Hook.ONRELEASE, function()
         return panel:_StopDrag()
@@ -310,8 +308,12 @@ function Panel.new(parent, options, flowManaged)
         self.dockButton = createToggle(self.overlay, self, false)
         Wheel.bind(self.popoutButton, options)
     end
-    if self._dockDraggable then self.dockDragLayer = createDragLayer(self.dock, self) end
-    if self._canPopout then self.overlayDragLayer = createDragLayer(self.overlay, self) end
+    if self._dockDraggable then
+        self.dockDragLayer = createDragLayer(self.parent, self.dock, self)
+    end
+    if self._canPopout then
+        self.overlayDragLayer = createDragLayer(self.overlayParent, self.overlay, self)
+    end
     self.dockTooltip = Tooltip.attach(self.dock.root, parent, options.tooltip)
     self.overlayTooltip = Tooltip.attach(self.overlay.root, overlayParent, options.tooltip)
     self:SetPopoutClickthrough(self.popoutClickthrough)
@@ -340,8 +342,13 @@ function Panel:_SetAltDragActive(active)
         local enabled = activeSurface == surface
         layer.enabled = enabled
         layer.clickthrough = not enabled
+        layer.hidden = not enabled
         Cursor.apply(layer, config.Cursor.CURSOR_USE, enabled)
-        if enabled then layer:MoveToFront() end
+        if enabled then
+            layer:SetPos(surface.root.x, surface.root.y)
+            layer:SetSize(surface.root.width, surface.root.height)
+            layer:MoveToFront()
+        end
     end
     updateLayer(self.dockDragLayer, self.dock)
     updateLayer(self.overlayDragLayer, self.overlay)
@@ -365,7 +372,11 @@ function Panel:_BeginDrag(surface)
     }
     surface.root:MoveToFront()
     local dragLayer = surface == self.overlay and self.overlayDragLayer or self.dockDragLayer
-    if dragLayer then dragLayer:MoveToFront() end
+    if dragLayer then
+        dragLayer:SetPos(0, 0)
+        dragLayer:SetSize(0, 0, 1.0, 1.0)
+        dragLayer:MoveToFront()
+    end
     return false
 end
 
@@ -383,28 +394,15 @@ function Panel:_MoveDrag()
     return false
 end
 
-function Panel:_CreateDragCapture()
-    if not self.dragState or self.dragCapture then return false end
-    local captureParent = self.dragState.surface == self.overlay and self.overlayParent or self.parent
-    self.dragCapture = ui.Button.new(captureParent)
-    self.dragCapture:SetSize(0, 0, 1.0, 1.0)
-    self.dragCapture.clickthrough = false
-    self.dragCapture.alpha = 0
-    self.dragCapture.text.content = ""
-    Cursor.apply(self.dragCapture, config.Cursor.CURSOR_USE, true)
-    self.dragCapture:MoveToFront()
-    self.dragCapture:Subscribe(ui.Hook.ONHOLD, function() return self:_MoveDrag() end)
-    self.dragCapture:Subscribe(ui.Hook.ONDRAG, function() return self:_MoveDrag() end)
-    self.dragCapture:Subscribe(ui.Hook.ONRELEASE, function() return self:_StopDrag() end)
-    self.dragCapture:Subscribe(ui.Hook.ONDRAGCOMPLETE, function() return self:_StopDrag() end)
-    return false
-end
-
 function Panel:_StopDrag()
+    local surface = self.dragState and self.dragState.surface or nil
     self.dragState = nil
-    if self.dragCapture then
-        self.dragCapture:Destroy()
-        self.dragCapture = nil
+    if surface then
+        local dragLayer = surface == self.overlay and self.overlayDragLayer or self.dockDragLayer
+        if dragLayer then
+            dragLayer:SetPos(surface.root.x, surface.root.y)
+            dragLayer:SetSize(surface.root.width, surface.root.height)
+        end
     end
     return false
 end
@@ -463,6 +461,16 @@ function Panel:SetSize(width, height)
     self:_UpdateFlowHeight()
     self.dockOwner.contentWidth = self.contentWidth
     self.overlayOwner.contentWidth = self.contentWidth
+    if self.dragState == nil then
+        if self.dockDragLayer then
+            self.dockDragLayer:SetPos(self.dock.root.x, self.dock.root.y)
+            self.dockDragLayer:SetSize(self.dock.root.width, self.dock.root.height)
+        end
+        if self.overlayDragLayer then
+            self.overlayDragLayer:SetPos(self.overlay.root.x, self.overlay.root.y)
+            self.overlayDragLayer:SetSize(self.overlay.root.width, self.overlay.root.height)
+        end
+    end
 end
 
 function Panel:AddText(value)
@@ -795,6 +803,11 @@ function Panel:Destroy()
     if self.overlay and self.overlay.content then Tooltip.unregisterContext(self.overlay.content) end
     if self.dockTooltip then self.dockTooltip:Destroy() self.dockTooltip = nil end
     if self.overlayTooltip then self.overlayTooltip:Destroy() self.overlayTooltip = nil end
+    if self.dockDragLayer then self.dockDragLayer:Destroy() self.dockDragLayer = nil end
+    if self.overlayDragLayer then
+        self.overlayDragLayer:Destroy()
+        self.overlayDragLayer = nil
+    end
     if self.dock and self.dock.root then self.dock.root:Destroy() end
     if self.overlay and self.overlay.root then self.overlay.root:Destroy() end
     self.root = nil
