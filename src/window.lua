@@ -1,26 +1,8 @@
 local Sprites = require("src/core/sprites")
-local BigSpinner = require("src/big_spinner")
-local CheckboxButton = require("src/checkbox_button")
-local ColourPicker = require("src/colour_picker")
-local ComboBox = require("src/combo_box")
-local CollapseButton = require("src/collapse_button")
-local Divider = require("src/divider")
-local FancyButton = require("src/fancy_button")
-local ItemGrid = require("src/item_grid")
-local ItemSlot = require("src/item_slot")
-local List = require("src/list")
-local Panel = require("src/panel")
+local ContentMethods = require("src/core/content_methods")
 local Text = require("src/text")
-local Tabs = require("src/tabs")
 local Tooltip = require("src/tooltip")
 local Layout = require("src/core/layout")
-local Spinner = require("src/spinner")
-local RibbonButton = require("src/ribbon_button")
-local RadioButton = require("src/radio_button")
-local SimpleButton = require("src/simple_button")
-local Slider = require("src/slider")
-local SpriteButton = require("src/sprite_button")
-local TextField = require("src/text_field")
 
 local Window = {}
 Window.__index = Window
@@ -262,127 +244,9 @@ function Window:SetTitle(title)
     if self.titleText then self.titleText.content = title or "" end
 end
 
-function Window:AddText(value)
-    return Text.append(self, value, false)
-end
-
-function Window:AddTitle(value)
-    return Text.append(self, value, true)
-end
-
-function Window:AddSpinner(options)
-    local placed = Layout.place(self, options, { width = 29, height = 29 })
-    return Layout.manage(self, Spinner.new(self.content, placed), placed)
-end
-
-function Window:AddBigSpinner(options)
-    local placed = Layout.place(self, options, { width = 72, height = 72 })
-    return Layout.manage(self, BigSpinner.new(self.content, placed), placed)
-end
-
-function Window:AddDivider(options)
-    local placed = Layout.place(self, Divider.flowOptions(options), { width = 0, height = 60, fillWidth = true })
-    return Layout.manage(self, Divider.new(self.content, placed), placed)
-end
-
-function Window:AddItemSlot(object, options)
-    local placed = Layout.place(self, options, { width = 40, height = 40 })
-    return Layout.manage(self, ItemSlot.new(self.content, object, placed), placed)
-end
-
-function Window:AddItemGrid(objects, options)
-    local width, height = ItemGrid.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, ItemGrid.new(self.content, objects, placed), placed)
-end
-
-function Window:AddTabs(tabs, options)
-    local width, height = Tabs.getSize(tabs, options)
-    local placed = Layout.place(
-        self,
-        Tabs.flowOptions(options),
-        { width = width, height = height, fillWidth = true }
-    )
-    return Layout.manage(self, Tabs.new(self.content, tabs, placed), placed)
-end
-
-function Window:AddCollapseButton(text, options)
-    local width, height = CollapseButton.getSize(text, options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    local button = Layout.manage(self, CollapseButton.new(self.content, text, placed), placed)
-    return button:BindFlow(self)
-end
-
-function Window:AddPanel(options)
-    local width, height = Panel.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    local panel = Layout.manage(self, Panel.new(self.content, placed, true), placed)
-    return panel:BindFlow(self)
-end
-
-function Window:AddRadioButton(choices, options)
-    local width, height = RadioButton.getSize(choices, options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, RadioButton.new(self.content, choices, placed), placed)
-end
-
-function Window:AddCheckboxButton(choices, options)
-    local width, height = CheckboxButton.getSize(choices, options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, CheckboxButton.new(self.content, choices, placed), placed)
-end
-
-function Window:AddColourPicker(options)
-    local width, height = ColourPicker.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, ColourPicker.new(self.content, placed), placed)
-end
-
-function Window:AddTextField(options)
-    local width, height = TextField.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, TextField.new(self.content, placed), placed)
-end
-
-function Window:AddComboBox(options)
-    local width, height = ComboBox.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, ComboBox.new(self.content, placed), placed)
-end
-
-function Window:AddList(options)
-    local width, height = List.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, List.new(self.content, placed), placed)
-end
-
-function Window:AddRibbonButton(spriteID, action, options)
-    local placed = Layout.place(self, options, { width = 32, height = 32 })
-    return Layout.manage(self, RibbonButton.new(self.content, spriteID, action, placed), placed)
-end
-
-function Window:AddSimpleButton(content, action, options)
-    local width, height = SimpleButton.getSize(content, options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, SimpleButton.new(self.content, content, action, placed), placed)
-end
-
-function Window:AddSlider(options)
-    local width, height = Slider.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, Slider.new(self.content, placed), placed)
-end
-
-function Window:AddFancyButton(text, action, options)
-    local width, height = FancyButton.getSize(text, options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, FancyButton.new(self.content, text, action, placed), placed)
-end
-
-function Window:AddSpriteButton(spriteName, action, options)
-    local placed = Layout.place(self, options, { width = 24, height = 24 })
-    return Layout.manage(self, SpriteButton.new(self.content, spriteName, action, placed), placed)
-end
+-- A window is a standard single-surface content host. Component definitions and
+-- flow defaults live in content_methods rather than being repeated here.
+ContentMethods.installSingle(Window)
 
 function Window:_RegisterOverlay(component, isVisible, layout)
     self.overlays[component] = { isVisible = isVisible, layout = layout }

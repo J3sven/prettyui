@@ -1,24 +1,12 @@
 local Sprites = require("src/core/sprites")
-local BigSpinner = require("src/big_spinner")
-local CheckboxButton = require("src/checkbox_button")
 local ColourPicker = require("src/colour_picker")
 local ComboBox = require("src/combo_box")
-local CollapseButton = require("src/collapse_button")
+local ContentMethods = require("src/core/content_methods")
 local Cursor = require("src/core/cursor")
-local Divider = require("src/divider")
-local FancyButton = require("src/fancy_button")
-local ItemGrid = require("src/item_grid")
-local ItemSlot = require("src/item_slot")
 local List = require("src/list")
 local Layout = require("src/core/layout")
-local RadioButton = require("src/radio_button")
-local RibbonButton = require("src/ribbon_button")
-local SimpleButton = require("src/simple_button")
 local Slider = require("src/slider")
-local Spinner = require("src/spinner")
-local SpriteButton = require("src/sprite_button")
 local TextField = require("src/text_field")
-local Text = require("src/text")
 local Tabs = require("src/tabs")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
@@ -474,54 +462,14 @@ function Panel:SetSize(width, height)
     end
 end
 
-function Panel:AddText(value)
-    return pairObjects(self, Text.append(self.dockOwner, value, false), Text.append(self.overlayOwner, value, false))
-end
-
-function Panel:AddTitle(value)
-    return pairObjects(self, Text.append(self.dockOwner, value, true), Text.append(self.overlayOwner, value, true))
-end
-
-function Panel:AddSpinner(options)
-    local dockOptions = Layout.place(self.dockOwner, options, { width = 29, height = 29 })
-    local overlayOptions = Layout.place(self.overlayOwner, options, { width = 29, height = 29 })
-    return pairObjects(self,
-        Layout.manage(self.dockOwner, Spinner.new(self.dock.content, dockOptions), dockOptions),
-        Layout.manage(self.overlayOwner, Spinner.new(self.overlay.content, overlayOptions), overlayOptions))
-end
-
-function Panel:AddBigSpinner(options)
-    local dockOptions = Layout.place(self.dockOwner, options, { width = 72, height = 72 })
-    local overlayOptions = Layout.place(self.overlayOwner, options, { width = 72, height = 72 })
-    return pairObjects(self,
-        Layout.manage(self.dockOwner, BigSpinner.new(self.dock.content, dockOptions), dockOptions),
-        Layout.manage(self.overlayOwner, BigSpinner.new(self.overlay.content, overlayOptions), overlayOptions))
-end
-
-function Panel:AddDivider(options)
-    local dockOptions = Layout.place(self.dockOwner, Divider.flowOptions(options), { width = 0, height = 60, fillWidth = true })
-    local overlayOptions = Layout.place(self.overlayOwner, Divider.flowOptions(options), { width = 0, height = 60, fillWidth = true })
-    return pairObjects(self,
-        Layout.manage(self.dockOwner, Divider.new(self.dock.content, dockOptions), dockOptions),
-        Layout.manage(self.overlayOwner, Divider.new(self.overlay.content, overlayOptions), overlayOptions))
-end
-
-function Panel:AddItemSlot(object, options)
-    local dockOptions = Layout.place(self.dockOwner, options, { width = 40, height = 40 })
-    local overlayOptions = Layout.place(self.overlayOwner, options, { width = 40, height = 40 })
-    return pairObjects(self,
-        Layout.manage(self.dockOwner, ItemSlot.new(self.dock.content, object, dockOptions), dockOptions),
-        Layout.manage(self.overlayOwner, ItemSlot.new(self.overlay.content, object, overlayOptions), overlayOptions))
-end
-
-function Panel:AddItemGrid(objects, options)
-    local width, height = ItemGrid.getSize(options)
-    local dockOptions = Layout.place(self.dockOwner, options, { width = width, height = height })
-    local overlayOptions = Layout.place(self.overlayOwner, options, { width = width, height = height })
-    return pairObjects(self,
-        Layout.manage(self.dockOwner, ItemGrid.new(self.dock.content, objects, dockOptions), dockOptions),
-        Layout.manage(self.overlayOwner, ItemGrid.new(self.overlay.content, objects, overlayOptions), overlayOptions))
-end
+-- Install the shared Add... API against both panel surfaces. The stateful methods
+-- below overwrite their generated counterparts to keep dock and popout state in sync.
+ContentMethods.installPaired(Panel, function(panel)
+    return {
+        { owner = panel.dockOwner, content = panel.dock.content },
+        { owner = panel.overlayOwner, content = panel.overlay.content },
+    }
+end, pairObjects)
 
 function Panel:AddTabs(tabs, options)
     local width, height = Tabs.getSize(tabs, options)
@@ -548,54 +496,6 @@ function Panel:AddTabs(tabs, options)
     proxy = pairObjects(self,
         Layout.manage(self.dockOwner, Tabs.new(self.dock.content, tabs, dockOptions), dockOptions),
         Layout.manage(self.overlayOwner, Tabs.new(self.overlay.content, tabs, overlayOptions), overlayOptions))
-    return proxy
-end
-
-function Panel:AddCollapseButton(text, options)
-    local width, height = CollapseButton.getSize(text, options)
-    local dockOptions = Layout.place(self.dockOwner, options, { width = width, height = height, fillWidth = true })
-    local overlayOptions = Layout.place(self.overlayOwner, options, { width = width, height = height, fillWidth = true })
-    local dock = Layout.manage(self.dockOwner, CollapseButton.new(self.dock.content, text, dockOptions), dockOptions)
-    local overlay = Layout.manage(self.overlayOwner, CollapseButton.new(self.overlay.content, text, overlayOptions), overlayOptions)
-    dock:BindFlow(self.dockOwner)
-    overlay:BindFlow(self.overlayOwner)
-    return pairObjects(self, dock, overlay)
-end
-
-local function selectionOptions(panel, options, proxyReference)
-    local copied = copyOptions(options)
-    if copied.onChange then
-        local onChange = copied.onChange
-        copied.onChange = function(_, ...)
-            onChange(proxyReference(), ...)
-        end
-    end
-    return copied
-end
-
-function Panel:AddRadioButton(choices, options)
-    local proxy
-    local dockOptions = selectionOptions(self, options, function() return proxy end)
-    local overlayOptions = selectionOptions(self, options, function() return proxy end)
-    local width, height = RadioButton.getSize(choices, options)
-    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = width, height = height, fillWidth = true })
-    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = width, height = height, fillWidth = true })
-    local dock = Layout.manage(self.dockOwner, RadioButton.new(self.dock.content, choices, dockOptions), dockOptions)
-    local overlay = Layout.manage(self.overlayOwner, RadioButton.new(self.overlay.content, choices, overlayOptions), overlayOptions)
-    proxy = pairObjects(self, dock, overlay)
-    return proxy
-end
-
-function Panel:AddCheckboxButton(choices, options)
-    local proxy
-    local dockOptions = selectionOptions(self, options, function() return proxy end)
-    local overlayOptions = selectionOptions(self, options, function() return proxy end)
-    local width, height = CheckboxButton.getSize(choices, options)
-    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = width, height = height, fillWidth = true })
-    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = width, height = height, fillWidth = true })
-    local dock = Layout.manage(self.dockOwner, CheckboxButton.new(self.dock.content, choices, dockOptions), dockOptions)
-    local overlay = Layout.manage(self.overlayOwner, CheckboxButton.new(self.overlay.content, choices, overlayOptions), overlayOptions)
-    proxy = pairObjects(self, dock, overlay)
     return proxy
 end
 
@@ -750,38 +650,6 @@ function Panel:AddList(options)
     return proxy
 end
 
-local function actionOptions(options, action, proxyReference)
-    if action == nil then return nil, copyOptions(options) end
-    return function(_, ...)
-        action(proxyReference(), ...)
-    end, copyOptions(options)
-end
-
-function Panel:AddRibbonButton(spriteID, action, options)
-    local proxy
-    local dockAction, dockOptions = actionOptions(options, action, function() return proxy end)
-    local overlayAction, overlayOptions = actionOptions(options, action, function() return proxy end)
-    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = 32, height = 32 })
-    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = 32, height = 32 })
-    local dock = Layout.manage(self.dockOwner, RibbonButton.new(self.dock.content, spriteID, dockAction, dockOptions), dockOptions)
-    local overlay = Layout.manage(self.overlayOwner, RibbonButton.new(self.overlay.content, spriteID, overlayAction, overlayOptions), overlayOptions)
-    proxy = pairObjects(self, dock, overlay)
-    return proxy
-end
-
-function Panel:AddSimpleButton(content, action, options)
-    local proxy
-    local dockAction, dockOptions = actionOptions(options, action, function() return proxy end)
-    local overlayAction, overlayOptions = actionOptions(options, action, function() return proxy end)
-    local width, height = SimpleButton.getSize(content, options)
-    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = width, height = height })
-    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = width, height = height })
-    local dock = Layout.manage(self.dockOwner, SimpleButton.new(self.dock.content, content, dockAction, dockOptions), dockOptions)
-    local overlay = Layout.manage(self.overlayOwner, SimpleButton.new(self.overlay.content, content, overlayAction, overlayOptions), overlayOptions)
-    proxy = pairObjects(self, dock, overlay)
-    return proxy
-end
-
 function Panel:AddSlider(options)
     local proxy
     local syncing = false
@@ -803,31 +671,6 @@ function Panel:AddSlider(options)
     proxy = pairObjects(self,
         Layout.manage(self.dockOwner, Slider.new(self.dock.content, dockOptions), dockOptions),
         Layout.manage(self.overlayOwner, Slider.new(self.overlay.content, overlayOptions), overlayOptions))
-    return proxy
-end
-
-function Panel:AddFancyButton(text, action, options)
-    local proxy
-    local dockAction, dockOptions = actionOptions(options, action, function() return proxy end)
-    local overlayAction, overlayOptions = actionOptions(options, action, function() return proxy end)
-    local width, height = FancyButton.getSize(text, options)
-    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = width, height = height })
-    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = width, height = height })
-    local dock = Layout.manage(self.dockOwner, FancyButton.new(self.dock.content, text, dockAction, dockOptions), dockOptions)
-    local overlay = Layout.manage(self.overlayOwner, FancyButton.new(self.overlay.content, text, overlayAction, overlayOptions), overlayOptions)
-    proxy = pairObjects(self, dock, overlay)
-    return proxy
-end
-
-function Panel:AddSpriteButton(spriteName, action, options)
-    local proxy
-    local dockAction, dockOptions = actionOptions(options, action, function() return proxy end)
-    local overlayAction, overlayOptions = actionOptions(options, action, function() return proxy end)
-    dockOptions = Layout.place(self.dockOwner, dockOptions, { width = 24, height = 24 })
-    overlayOptions = Layout.place(self.overlayOwner, overlayOptions, { width = 24, height = 24 })
-    local dock = Layout.manage(self.dockOwner, SpriteButton.new(self.dock.content, spriteName, dockAction, dockOptions), dockOptions)
-    local overlay = Layout.manage(self.overlayOwner, SpriteButton.new(self.overlay.content, spriteName, overlayAction, overlayOptions), overlayOptions)
-    proxy = pairObjects(self, dock, overlay)
     return proxy
 end
 
