@@ -108,38 +108,36 @@ function Scrollbar.new(parent, options)
     self.trackBottom:SetSize(BAR_WIDTH, END_SIZE)
 
     self.thumb = ui.Layer.new(self.track)
-    self.thumb.clickthrough = false
+    self.thumb.clickthrough = true
     self.thumbTop = sprite(self.thumb, Sprites.SCROLL_THUMB_TOP)
+    self.thumbTop.clickthrough = true
     self.thumbTop:SetSize(BAR_WIDTH, END_SIZE)
     self.thumbCentre = sprite(self.thumb, Sprites.SCROLL_THUMB_CENTRE)
+    self.thumbCentre.clickthrough = true
     self.thumbCentre:SetPos(0, END_SIZE)
     self.thumbCentre:SetSize(BAR_WIDTH, -END_SIZE * 2, 0, 1.0)
     self.thumbCentre.isTiling = true
     self.thumbBottom = sprite(self.thumb, Sprites.SCROLL_THUMB_BOTTOM)
+    self.thumbBottom.clickthrough = true
     self.thumbBottom:SetPos(0, -END_SIZE, 0, 1.0)
     self.thumbBottom:SetSize(BAR_WIDTH, END_SIZE)
 
-    local dragStart = nil
-    self.thumb:Subscribe(ui.Hook.ONCLICK, function()
+    self.thumbDrag = ui.Layer.new(parent)
+    self.thumbDrag.clickthrough = false
+    self.thumbDrag:MoveToFront()
+
+    self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function()
         local mouse = Mouse.GetPosition()
-        if mouse then dragStart = { mouseY = mouse.y, scrollY = self.scrollY } end
+        if mouse then self.dragStart = { mouseY = mouse.y, scrollY = self.scrollY } end
+        self.thumbDrag:SetPos(0, 0)
+        self.thumbDrag:SetSize(0, 0, 1.0, 1.0)
+        self.thumbDrag:MoveToFront()
         return false
     end)
-    self.thumb:Subscribe(ui.Hook.ONHOLD, function()
-        local mouse = Mouse.GetPosition()
-        if dragStart and mouse then
-            local thumbTravel = self.trackHeight - self.thumbHeight
-            local maxScroll = self.contentHeight - self.height
-            if thumbTravel > 0 then
-                self:SetScrollPosition(dragStart.scrollY + (mouse.y - dragStart.mouseY) * maxScroll / thumbTravel)
-            end
-        end
-        return false
-    end)
-    self.thumb:Subscribe(ui.Hook.ONRELEASE, function()
-        dragStart = nil
-        return false
-    end)
+    self.thumbDrag:Subscribe(ui.Hook.ONHOLD, function() return self:_UpdateDrag() end)
+    self.thumbDrag:Subscribe(ui.Hook.ONDRAG, function() return self:_UpdateDrag() end)
+    self.thumbDrag:Subscribe(ui.Hook.ONRELEASE, function() return self:_StopDrag() end)
+    self.thumbDrag:Subscribe(ui.Hook.ONDRAGCOMPLETE, function() return self:_StopDrag() end)
 
     self.track:Subscribe(ui.Hook.ONCLICK, function(_, _, clickY)
         local thumbTravel = self.trackHeight - self.thumbHeight
@@ -158,7 +156,7 @@ function Scrollbar.new(parent, options)
     self.viewport:Subscribe(ui.Hook.ONSCROLLWHEEL, onWheel)
     self.content:Subscribe(ui.Hook.ONSCROLLWHEEL, onWheel)
     self.track:Subscribe(ui.Hook.ONSCROLLWHEEL, onWheel)
-    self.thumb:Subscribe(ui.Hook.ONSCROLLWHEEL, onWheel)
+    self.thumbDrag:Subscribe(ui.Hook.ONSCROLLWHEEL, onWheel)
     self.upArrow:Subscribe(ui.Hook.ONSCROLLWHEEL, onWheel)
     self.downArrow:Subscribe(ui.Hook.ONSCROLLWHEEL, onWheel)
 
@@ -183,6 +181,7 @@ function Scrollbar:_LayoutThumb()
     self.track.hidden = not self.scrollbarVisible
     self.upArrow.hidden = not self.scrollbarVisible
     self.downArrow.hidden = not self.scrollbarVisible
+    self.thumbDrag.hidden = not self.scrollbarVisible
 end
 
 function Scrollbar:SetScrollPosition(position)
@@ -195,6 +194,37 @@ function Scrollbar:SetScrollPosition(position)
         thumbY = math.floor(self.scrollY / maxScroll * (self.trackHeight - self.thumbHeight))
     end
     self.thumb:SetPos(0, thumbY)
+    if self.dragStart == nil then self:_LayoutThumbDrag() end
+end
+
+function Scrollbar:_LayoutThumbDrag()
+    if self.thumbDrag == nil or self.root == nil then return end
+    self.thumbDrag:SetPos(
+        (self.root.x or 0) + (self.track.x or 0) + (self.thumb.x or 0),
+        (self.root.y or 0) + (self.track.y or 0) + (self.thumb.y or 0)
+    )
+    self.thumbDrag:SetSize(BAR_WIDTH, self.thumbHeight)
+end
+
+function Scrollbar:_UpdateDrag()
+    local mouse = Mouse.GetPosition()
+    if self.dragStart and mouse then
+        local thumbTravel = self.trackHeight - self.thumbHeight
+        local maxScroll = self.contentHeight - self.height
+        if thumbTravel > 0 then
+            self:SetScrollPosition(
+                self.dragStart.scrollY +
+                (mouse.y - self.dragStart.mouseY) * maxScroll / thumbTravel
+            )
+        end
+    end
+    return false
+end
+
+function Scrollbar:_StopDrag()
+    self.dragStart = nil
+    self:_LayoutThumbDrag()
+    return false
 end
 
 function Scrollbar:ScrollBy(delta)
@@ -337,6 +367,7 @@ function Scrollbar:AddSpriteButton(spriteName, action, options)
 end
 
 function Scrollbar:Destroy()
+    self:_StopDrag()
     Layout.destroyManaged(self)
     if self.content then
         Tooltip.unregisterContext(self.content)
@@ -345,6 +376,10 @@ function Scrollbar:Destroy()
     if self.tooltip then
         self.tooltip:Destroy()
         self.tooltip = nil
+    end
+    if self.thumbDrag then
+        self.thumbDrag:Destroy()
+        self.thumbDrag = nil
     end
     if self.root then
         self.root:Destroy()

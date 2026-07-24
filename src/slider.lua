@@ -110,10 +110,14 @@ function Slider.new(parent, options)
     self.barRight:SetSize(BAR_END_WIDTH, BAR_HEIGHT)
     self.barRight.isFlippedHorizontally = true
 
-    self.thumb = interactiveSprite(self.track)
+    self.thumb = sprite(self.track, Sprites.SLIDER.thumb.normal)
     self.thumb:SetPos(0, math.floor((HEIGHT - THUMB_HEIGHT) / 2))
     self.thumb:SetSize(THUMB_WIDTH, THUMB_HEIGHT)
-    Wheel.bind(self.thumb, options)
+
+    self.thumbDrag = ui.Layer.new(self.parent)
+    self.thumbDrag.clickthrough = false
+    self.thumbDrag:MoveToFront()
+    Wheel.bind(self.thumbDrag, options)
 
     self:_BindButton(self.decrease, -1)
     self:_BindButton(self.increase, 1)
@@ -126,36 +130,37 @@ function Slider.new(parent, options)
         return false
     end)
 
-    self.thumb:Subscribe(ui.Hook.ONMOUSEOVER, function()
+    self.thumbDrag:Subscribe(ui.Hook.ONMOUSEOVER, function()
         self.thumbHovered = true
         self:_UpdateState()
         return true
     end)
-    self.thumb:Subscribe(ui.Hook.ONMOUSELEAVE, function()
+    self.thumbDrag:Subscribe(ui.Hook.ONMOUSELEAVE, function()
         self.thumbHovered = false
-        if self.thumbPressed then self:_CreateDragCapture() end
         self:_UpdateState()
         return true
     end)
-    self.thumb:Subscribe(ui.Hook.ONCLICK, function()
+    self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function()
         if self.disabled then return false end
         local mouse = Mouse.GetPosition()
         self.thumbPressed = true
         if mouse then self.dragStart = { mouseX = mouse.x, value = self.value } end
+        self.thumbDrag:SetPos(0, 0)
+        self.thumbDrag:SetSize(0, 0, 1.0, 1.0)
+        self.thumbDrag:MoveToFront()
         self:_UpdateState()
         return false
     end)
-    self.thumb:Subscribe(ui.Hook.ONHOLD, function()
+    self.thumbDrag:Subscribe(ui.Hook.ONHOLD, function()
         return self:_UpdateDrag()
     end)
-    self.thumb:Subscribe(ui.Hook.ONDRAG, function()
-        self:_CreateDragCapture()
+    self.thumbDrag:Subscribe(ui.Hook.ONDRAG, function()
         return self:_UpdateDrag()
     end)
-    self.thumb:Subscribe(ui.Hook.ONRELEASE, function()
+    self.thumbDrag:Subscribe(ui.Hook.ONRELEASE, function()
         return self:_StopDrag()
     end)
-    self.thumb:Subscribe(ui.Hook.ONDRAGCOMPLETE, function()
+    self.thumbDrag:Subscribe(ui.Hook.ONDRAGCOMPLETE, function()
         return self:_StopDrag()
     end)
 
@@ -227,7 +232,9 @@ function Slider:_UpdateState()
     self.increase.clickthrough = not self.increase.enabled
     Cursor.apply(self.decrease, self.hoverCursor, self.decrease.enabled)
     Cursor.apply(self.increase, self.hoverCursor, self.increase.enabled)
-    Cursor.apply(self.thumb, self.hoverCursor, not self.disabled)
+    self.thumbDrag.enabled = not self.disabled
+    self.thumbDrag.clickthrough = self.disabled
+    Cursor.apply(self.thumbDrag, self.hoverCursor, not self.disabled)
 end
 
 function Slider:_LayoutValue()
@@ -244,6 +251,16 @@ function Slider:_LayoutValue()
     self.barMiddle.hidden = barHidden or middleWidth == 0
     self.barRight:SetX(math.max(BAR_END_WIDTH, filledWidth - BAR_END_WIDTH))
     self.barRight.hidden = barHidden
+    if self.dragStart == nil then self:_LayoutThumbDrag() end
+end
+
+function Slider:_LayoutThumbDrag()
+    if self.thumbDrag == nil or self.root == nil then return end
+    self.thumbDrag:SetPos(
+        (self.root.x or 0) + (self.track.x or 0) + (self.thumb.x or 0),
+        (self.root.y or 0) + (self.track.y or 0) + (self.thumb.y or 0)
+    )
+    self.thumbDrag:SetSize(THUMB_WIDTH, THUMB_HEIGHT)
 end
 
 function Slider:_UpdateDrag()
@@ -255,28 +272,11 @@ function Slider:_UpdateDrag()
     return false
 end
 
-function Slider:_CreateDragCapture()
-    if self.dragCapture or not self.thumbPressed then return false end
-    self.dragCapture = ui.Button.new(self.parent)
-    self.dragCapture:SetSize(0, 0, 1.0, 1.0)
-    self.dragCapture.clickthrough = false
-    self.dragCapture.alpha = 0
-    self.dragCapture.text.content = ""
-    self.dragCapture:MoveToFront()
-    self.dragCapture:Subscribe(ui.Hook.ONHOLD, function() return self:_UpdateDrag() end)
-    self.dragCapture:Subscribe(ui.Hook.ONDRAG, function() return self:_UpdateDrag() end)
-    self.dragCapture:Subscribe(ui.Hook.ONRELEASE, function() return self:_StopDrag() end)
-    self.dragCapture:Subscribe(ui.Hook.ONDRAGCOMPLETE, function() return self:_StopDrag() end)
-    return false
-end
-
 function Slider:_StopDrag()
     self.dragStart = nil
     self.thumbPressed = false
-    if self.dragCapture then
-        self.dragCapture:Destroy()
-        self.dragCapture = nil
-    end
+    self.thumbHovered = false
+    self:_LayoutThumbDrag()
     self:_UpdateState()
     return false
 end
@@ -312,6 +312,10 @@ function Slider:Destroy()
     if self.tooltip then
         self.tooltip:Destroy()
         self.tooltip = nil
+    end
+    if self.thumbDrag then
+        self.thumbDrag:Destroy()
+        self.thumbDrag = nil
     end
     if self.root then
         self.root:Destroy()

@@ -146,18 +146,18 @@ function Window.new(parent, options)
             alignHorizontal = ui.AlignMode.CENTRE,
         })
 
-        self.titleDrag = ui.Layer.new(self.root)
-        self.titleDrag:SetSize(-CLOSE_SIZE - 14, TITLE_HEIGHT, 1.0)
+        self.titleDrag = ui.Layer.new(self.parent)
+        self.titleDrag:MoveToFront()
+        self.titleDrag:SetPos(self.root.x, self.root.y)
+        self.titleDrag:SetSize(self.root.width - CLOSE_SIZE - 14, TITLE_HEIGHT)
         self.titleDrag.clickthrough = false
 
         local dragStart = nil
 
         local function stopDrag()
             dragStart = nil
-            if self.dragCapture then
-                self.dragCapture:Destroy()
-                self.dragCapture = nil
-            end
+            self.titleDrag:SetPos(self.root.x, self.root.y)
+            self.titleDrag:SetSize(self.root.width - CLOSE_SIZE - 14, TITLE_HEIGHT)
             return false
         end
 
@@ -172,22 +172,6 @@ function Window.new(parent, options)
             return false
         end
 
-        local function createDragCapture()
-            if self.dragCapture then return false end
-
-            self.dragCapture = ui.Button.new(self.parent)
-            self.dragCapture:SetSize(0, 0, 1.0, 1.0)
-            self.dragCapture.clickthrough = false
-            self.dragCapture.alpha = 0
-            self.dragCapture.text.content = ""
-            self.dragCapture:MoveToFront()
-            self.dragCapture:Subscribe(ui.Hook.ONHOLD, moveDrag)
-            self.dragCapture:Subscribe(ui.Hook.ONDRAG, moveDrag)
-            self.dragCapture:Subscribe(ui.Hook.ONRELEASE, stopDrag)
-            self.dragCapture:Subscribe(ui.Hook.ONDRAGCOMPLETE, stopDrag)
-            return false
-        end
-
         self.titleDrag:Subscribe(ui.Hook.ONCLICK, function()
             local mouse = Mouse.GetPosition()
             if mouse then
@@ -198,15 +182,13 @@ function Window.new(parent, options)
                     windowY = self.root.y,
                 }
                 self.root:MoveToFront()
+                self.titleDrag:MoveToFront()
             end
+            self.titleDrag:SetPos(0, 0)
+            self.titleDrag:SetSize(0, 0, 1.0, 1.0)
             return false
         end)
         self.titleDrag:Subscribe(ui.Hook.ONHOLD, moveDrag)
-        self.titleDrag:Subscribe(ui.Hook.ONDRAG, createDragCapture)
-        self.titleDrag:Subscribe(ui.Hook.ONMOUSELEAVE, function()
-            if dragStart then return createDragCapture() end
-            return false
-        end)
         self.titleDrag:Subscribe(ui.Hook.ONRELEASE, stopDrag)
         self.titleDrag:Subscribe(ui.Hook.ONDRAGCOMPLETE, stopDrag)
     else
@@ -393,6 +375,10 @@ end
 function Window:Show()
     self.root.hidden = false
     self.root:MoveToFront()
+    if self.titleDrag then
+        self.titleDrag.hidden = false
+        self.titleDrag:MoveToFront()
+    end
 end
 
 function Window:Close()
@@ -401,6 +387,7 @@ function Window:Close()
         self:Destroy()
     else
         self.root.hidden = true
+        if self.titleDrag then self.titleDrag.hidden = true end
     end
 end
 
@@ -414,13 +401,13 @@ function Window:Destroy()
         self.tooltip:Destroy()
         self.tooltip = nil
     end
-    if self.dragCapture then
-        self.dragCapture:Destroy()
-        self.dragCapture = nil
-    end
     if self.root then
         self.root:Destroy()
         self.root = nil
+    end
+    if self.titleDrag then
+        self.titleDrag:Destroy()
+        self.titleDrag = nil
     end
 end
 
