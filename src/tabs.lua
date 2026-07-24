@@ -1,24 +1,7 @@
-local BigSpinner = require("src/big_spinner")
-local CheckboxButton = require("src/checkbox_button")
-local ColourPicker = require("src/colour_picker")
-local ComboBox = require("src/combo_box")
-local CollapseButton = require("src/collapse_button")
+local ContentMethods = require("src/core/content_methods")
 local Cursor = require("src/core/cursor")
-local Divider = require("src/divider")
-local FancyButton = require("src/fancy_button")
-local ItemGrid = require("src/item_grid")
-local ItemSlot = require("src/item_slot")
-local List = require("src/list")
 local Layout = require("src/core/layout")
-local RadioButton = require("src/radio_button")
-local RibbonButton = require("src/ribbon_button")
-local SimpleButton = require("src/simple_button")
-local Slider = require("src/slider")
-local Spinner = require("src/spinner")
-local SpriteButton = require("src/sprite_button")
-local TextField = require("src/text_field")
 local Sprites = require("src/core/sprites")
-local Text = require("src/text")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
 
@@ -438,109 +421,13 @@ function Tabs:Destroy()
     if self.root then self.root:Destroy() self.root = nil end
 end
 
-function TabPage:AddText(value)
-    return Text.append(self, value, false)
-end
-
-function TabPage:AddTitle(value)
-    return Text.append(self, value, true)
-end
-
-function TabPage:AddSpinner(options)
-    local placed = Layout.place(self, options, { width = 29, height = 29 })
-    return Layout.manage(self, Spinner.new(self.content, placed), placed)
-end
-
-function TabPage:AddBigSpinner(options)
-    local placed = Layout.place(self, options, { width = 72, height = 72 })
-    return Layout.manage(self, BigSpinner.new(self.content, placed), placed)
-end
-
-function TabPage:AddDivider(options)
-    local placed = Layout.place(self, Divider.flowOptions(options), { width = 0, height = 60, fillWidth = true })
-    return Layout.manage(self, Divider.new(self.content, placed), placed)
-end
-
-function TabPage:AddItemSlot(object, options)
-    local placed = Layout.place(self, options, { width = 40, height = 40 })
-    return Layout.manage(self, ItemSlot.new(self.content, object, placed), placed)
-end
-
-function TabPage:AddItemGrid(objects, options)
-    local width, height = ItemGrid.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, ItemGrid.new(self.content, objects, placed), placed)
-end
-
-function TabPage:AddCollapseButton(text, options)
-    local width, height = CollapseButton.getSize(text, options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    local button = Layout.manage(self, CollapseButton.new(self.content, text, placed), placed)
-    return button:BindFlow(self)
-end
-
-function TabPage:AddRadioButton(choices, options)
-    local width, height = RadioButton.getSize(choices, options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, RadioButton.new(self.content, choices, placed), placed)
-end
-
-function TabPage:AddCheckboxButton(choices, options)
-    local width, height = CheckboxButton.getSize(choices, options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, CheckboxButton.new(self.content, choices, placed), placed)
-end
-
-function TabPage:AddColourPicker(options)
-    local width, height = ColourPicker.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, ColourPicker.new(self.content, placed), placed)
-end
-
-function TabPage:AddTextField(options)
-    local width, height = TextField.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, TextField.new(self.content, placed), placed)
-end
-
-function TabPage:AddComboBox(options)
-    local width, height = ComboBox.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, ComboBox.new(self.content, placed), placed)
-end
-
-function TabPage:AddList(options)
-    local width, height = List.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, List.new(self.content, placed), placed)
-end
-
-function TabPage:AddRibbonButton(spriteID, action, options)
-    local placed = Layout.place(self, options, { width = 32, height = 32 })
-    return Layout.manage(self, RibbonButton.new(self.content, spriteID, action, placed), placed)
-end
-
-function TabPage:AddSimpleButton(content, action, options)
-    local width, height = SimpleButton.getSize(content, options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, SimpleButton.new(self.content, content, action, placed), placed)
-end
-
-function TabPage:AddSlider(options)
-    local width, height = Slider.getSize(options)
-    local placed = Layout.place(self, options, { width = width, height = height, fillWidth = true })
-    return Layout.manage(self, Slider.new(self.content, placed), placed)
-end
-
-function TabPage:AddFancyButton(text, action, options)
-    local width, height = FancyButton.getSize(text, options)
-    local placed = Layout.place(self, options, { width = width, height = height })
-    return Layout.manage(self, FancyButton.new(self.content, text, action, placed), placed)
-end
-
-function TabPage:AddSpriteButton(spriteName, action, options)
-    local placed = Layout.place(self, options, { width = 24, height = 24 })
-    return Layout.manage(self, SpriteButton.new(self.content, spriteName, action, placed), placed)
-end
+-- A page is a normal single-surface host, but recursive tabs and popout panels
+-- are intentionally not part of its public content API.
+ContentMethods.installSingle(TabPage, {
+    exclude = {
+        AddPanel = true,
+        AddTabs = true,
+    },
+})
 
 return Tabs
