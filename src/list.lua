@@ -1,4 +1,5 @@
 local Cursor = require("src/core/cursor")
+local InterfaceMouse = require("src/core/mouse")
 local Palette = require("src/core/control_palette")
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
@@ -160,12 +161,12 @@ function List.new(parent, options)
 
     local dragStart = nil
     self.thumb:Subscribe(ui.Hook.ONCLICK, function()
-        local mouse = Mouse.GetPosition()
+        local mouse = InterfaceMouse.GetPosition()
         if mouse then dragStart = { mouseY = mouse.y, scrollY = self.scrollY } end
         return false
     end)
     self.thumb:Subscribe(ui.Hook.ONHOLD, function()
-        local mouse = Mouse.GetPosition()
+        local mouse = InterfaceMouse.GetPosition()
         local maxScroll = math.max(0, self.contentHeight - self:_ViewportHeight())
         local travel = self.track.height - self.thumbHeight
         if dragStart and mouse and maxScroll > 0 and travel > 0 then

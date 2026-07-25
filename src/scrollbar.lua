@@ -2,6 +2,7 @@ local Sprites = require("src/core/sprites")
 local ContentMethods = require("src/core/content_methods")
 local Tooltip = require("src/tooltip")
 local Layout = require("src/core/layout")
+local InterfaceMouse = require("src/core/mouse")
 
 local Scrollbar = {}
 Scrollbar.__index = Scrollbar
@@ -126,7 +127,7 @@ function Scrollbar.new(parent, options)
     end
 
     self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function()
-        local mouse = Mouse.GetPosition()
+        local mouse = InterfaceMouse.GetPosition()
         if mouse then self.dragStart = { mouseY = mouse.y, scrollY = self.scrollY } end
         self.thumbDrag:SetPos(0, 0)
         self.thumbDrag:SetSize(0, 0, 1.0, 1.0)
@@ -212,7 +213,7 @@ function Scrollbar:_LayoutThumbDrag()
 end
 
 function Scrollbar:_UpdateDrag()
-    local mouse = Mouse.GetPosition()
+    local mouse = InterfaceMouse.GetPosition()
     if self.dragStart and mouse then
         local thumbTravel = self.trackHeight - self.thumbHeight
         local maxScroll = self.contentHeight - self.height
