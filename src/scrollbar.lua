@@ -126,16 +126,21 @@ function Scrollbar.new(parent, options)
         end)
     end
 
-    self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function()
-        local mouse = InterfaceMouse.GetPosition()
+    self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function(component, x, y)
+        InterfaceMouse.BeginCapture(component)
+        local mouse = InterfaceMouse.GetPosition(component, x, y)
         if mouse then self.dragStart = { mouseY = mouse.y, scrollY = self.scrollY } end
         self.thumbDrag:SetPos(0, 0)
         self.thumbDrag:SetSize(0, 0, 1.0, 1.0)
         self.thumbDrag:MoveToFront()
         return false
     end)
-    self.thumbDrag:Subscribe(ui.Hook.ONHOLD, function() return self:_UpdateDrag() end)
-    self.thumbDrag:Subscribe(ui.Hook.ONDRAG, function() return self:_UpdateDrag() end)
+    self.thumbDrag:Subscribe(ui.Hook.ONHOLD, function(component, x, y)
+        return self:_UpdateDrag(component, x, y)
+    end)
+    self.thumbDrag:Subscribe(ui.Hook.ONDRAG, function(component, x, y)
+        return self:_UpdateDrag(component, x, y)
+    end)
     self.thumbDrag:Subscribe(ui.Hook.ONRELEASE, function() return self:_StopDrag() end)
     self.thumbDrag:Subscribe(ui.Hook.ONDRAGCOMPLETE, function() return self:_StopDrag() end)
 
@@ -212,8 +217,8 @@ function Scrollbar:_LayoutThumbDrag()
     self.thumbDrag:SetSize(BAR_WIDTH, self.thumbHeight)
 end
 
-function Scrollbar:_UpdateDrag()
-    local mouse = InterfaceMouse.GetPosition()
+function Scrollbar:_UpdateDrag(component, x, y)
+    local mouse = InterfaceMouse.GetPosition(component, x, y)
     if self.dragStart and mouse then
         local thumbTravel = self.trackHeight - self.thumbHeight
         local maxScroll = self.contentHeight - self.height
@@ -228,6 +233,7 @@ function Scrollbar:_UpdateDrag()
 end
 
 function Scrollbar:_StopDrag()
+    InterfaceMouse.EndCapture(self.thumbDrag)
     self.dragStart = nil
     self:_LayoutThumbDrag()
     return false

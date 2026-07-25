@@ -323,25 +323,31 @@ function ColourPicker:_PickerContentPosition()
         (self.pickerWindow.root.y or 0) + (self.pickerWindow.content.y or 0)
 end
 
-function ColourPicker:_UpdateFieldFromMouse()
-    local mouse = InterfaceMouse.GetPosition()
-    if mouse == nil then return false end
+function ColourPicker:_PickerLocalMousePosition(layer, x, y)
+    local mouse = InterfaceMouse.GetPosition(layer, x, y)
+    if mouse == nil then return nil, nil end
+    if layer ~= nil and x ~= nil and y ~= nil then return mouse.x, mouse.y end
     local contentX, contentY = self:_PickerContentPosition()
+    return mouse.x - contentX, mouse.y - contentY
+end
+
+function ColourPicker:_UpdateFieldFromMouse(layer, x, y)
+    local mouseX, mouseY = self:_PickerLocalMousePosition(layer, x, y)
+    if mouseX == nil then return false end
     self.pendingValue = clamp(
-        (mouse.x - contentX - FIELD_X) / (FIELD_SIZE - 1), 0, 1
+        (mouseX - FIELD_X) / (FIELD_SIZE - 1), 0, 1
     )
     self.pendingSaturation = 1 - clamp(
-        (mouse.y - contentY - FIELD_Y) / (FIELD_SIZE - 1), 0, 1
+        (mouseY - FIELD_Y) / (FIELD_SIZE - 1), 0, 1
     )
     self:_UpdatePickerVisuals(false)
     return false
 end
 
-function ColourPicker:_UpdateHueFromMouse()
-    local mouse = InterfaceMouse.GetPosition()
-    if mouse == nil then return false end
-    local _, contentY = self:_PickerContentPosition()
-    local ratio = clamp((mouse.y - contentY - HUE_Y) / (FIELD_SIZE - 1), 0, 1)
+function ColourPicker:_UpdateHueFromMouse(layer, x, y)
+    local _, mouseY = self:_PickerLocalMousePosition(layer, x, y)
+    if mouseY == nil then return false end
+    local ratio = clamp((mouseY - HUE_Y) / (FIELD_SIZE - 1), 0, 1)
     local hue = 1 - ratio
     local changed = hue ~= self.pendingHue
     self.pendingHue = hue
@@ -349,48 +355,58 @@ function ColourPicker:_UpdateHueFromMouse()
     return false
 end
 
-function ColourPicker:_UpdateAlphaFromMouse()
-    local mouse = InterfaceMouse.GetPosition()
-    if mouse == nil then return false end
-    local contentX = self:_PickerContentPosition()
+function ColourPicker:_UpdateAlphaFromMouse(layer, x, y)
+    local mouseX = self:_PickerLocalMousePosition(layer, x, y)
+    if mouseX == nil then return false end
     local ratio = clamp(
-        (mouse.x - contentX - ALPHA_X) / (ALPHA_WIDTH - 1), 0, 1
+        (mouseX - ALPHA_X) / (ALPHA_WIDTH - 1), 0, 1
     )
     self.pendingAlpha = math.floor(ratio * 255 + 0.5)
     self:_UpdatePickerVisuals(false)
     return false
 end
 
-function ColourPicker:_BeginPickerDrag(kind)
+function ColourPicker:_BeginPickerDrag(kind, layer, x, y)
     self.dragTarget = kind
-    local layer = self.fieldHit
+    self.dragCaptureExpanded = false
+    layer = layer or (kind == "hue" and self.hueHit) or
+        (kind == "alpha" and self.alphaHit) or self.fieldHit
+    InterfaceMouse.BeginCapture(layer)
     if kind == "hue" then
-        layer = self.hueHit
-        self:_UpdateHueFromMouse()
+        self:_UpdateHueFromMouse(layer, x, y)
     elseif kind == "alpha" then
-        layer = self.alphaHit
-        self:_UpdateAlphaFromMouse()
+        self:_UpdateAlphaFromMouse(layer, x, y)
     else
-        self:_UpdateFieldFromMouse()
+        self:_UpdateFieldFromMouse(layer, x, y)
     end
-    layer:SetPos(0, 0)
-    layer:SetSize(0, 0, 1.0, 1.0)
-    layer:MoveToFront()
     return false
 end
 
-function ColourPicker:_UpdatePickerDrag(kind)
+function ColourPicker:_UpdatePickerDrag(kind, layer, x, y, expandCapture)
     if self.dragTarget ~= kind then return false end
-    if kind == "hue" then return self:_UpdateHueFromMouse() end
-    if kind == "alpha" then return self:_UpdateAlphaFromMouse() end
-    return self:_UpdateFieldFromMouse()
+    if kind == "hue" then
+        self:_UpdateHueFromMouse(layer, x, y)
+    elseif kind == "alpha" then
+        self:_UpdateAlphaFromMouse(layer, x, y)
+    else
+        self:_UpdateFieldFromMouse(layer, x, y)
+    end
+    if expandCapture ~= false and not self.dragCaptureExpanded then
+        self.dragCaptureExpanded = true
+        layer:SetPos(0, 0)
+        layer:SetSize(0, 0, 1.0, 1.0)
+        layer:MoveToFront()
+    end
+    return false
 end
 
-function ColourPicker:_StopPickerDrag(kind)
+function ColourPicker:_StopPickerDrag(kind, layer, x, y)
     if self.dragTarget == kind then
-        self:_UpdatePickerDrag(kind)
+        self:_UpdatePickerDrag(kind, layer, x, y, false)
         self.dragTarget = nil
     end
+    self.dragCaptureExpanded = false
+    InterfaceMouse.EndCapture(layer)
     self.fieldHit:SetPos(FIELD_X, FIELD_Y)
     self.fieldHit:SetSize(FIELD_SIZE, FIELD_SIZE)
     self.hueHit:SetPos(HUE_X, HUE_Y)
@@ -403,17 +419,26 @@ function ColourPicker:_StopPickerDrag(kind)
 end
 
 function ColourPicker:_BindPickerDrag(layer, kind)
-    layer:Subscribe(ui.Hook.ONCLICK, function() return self:_BeginPickerDrag(kind) end)
-    layer:Subscribe(ui.Hook.ONHOLD, function() return self:_UpdatePickerDrag(kind) end)
-    layer:Subscribe(ui.Hook.ONDRAG, function() return self:_UpdatePickerDrag(kind) end)
-    layer:Subscribe(ui.Hook.ONRELEASE, function() return self:_StopPickerDrag(kind) end)
-    layer:Subscribe(ui.Hook.ONDRAGCOMPLETE, function()
-        return self:_StopPickerDrag(kind)
+    layer:Subscribe(ui.Hook.ONCLICK, function(component, x, y)
+        return self:_BeginPickerDrag(kind, component, x, y)
+    end)
+    layer:Subscribe(ui.Hook.ONHOLD, function(component, x, y)
+        return self:_UpdatePickerDrag(kind, component, x, y)
+    end)
+    layer:Subscribe(ui.Hook.ONDRAG, function(component, x, y)
+        return self:_UpdatePickerDrag(kind, component, x, y)
+    end)
+    layer:Subscribe(ui.Hook.ONRELEASE, function(component, x, y)
+        return self:_StopPickerDrag(kind, component, x, y)
+    end)
+    layer:Subscribe(ui.Hook.ONDRAGCOMPLETE, function(component, _, x, y)
+        return self:_StopPickerDrag(kind, component, x, y)
     end)
 end
 
 function ColourPicker:_ClearPickerReferences()
     self.dragTarget = nil
+    self.dragCaptureExpanded = false
     self.pickerWindow = nil
     self.fieldCanvas = nil
     self.hueCanvas = nil

@@ -40,4 +40,26 @@ expect(position.y, 100, "300% scale converts y to interface units")
 rawPosition = nil
 expect(InterfaceMouse.GetPosition(), nil, "unavailable mouse remains nil")
 
+local eventPosition = InterfaceMouse.GetPosition({ x = 20, y = 30 }, 5, 7)
+expect(eventPosition.x, 25, "hook coordinates include the component x position")
+expect(eventPosition.y, 37, "hook coordinates include the component y position")
+
+local capture = { x = 100, y = 80 }
+InterfaceMouse.BeginCapture(capture)
+capture.x, capture.y = 0, 0
+eventPosition = InterfaceMouse.GetPosition(capture, 8, 9)
+expect(eventPosition.x, 108, "capture preserves the original component x position")
+expect(eventPosition.y, 89, "capture preserves the original component y position")
+InterfaceMouse.EndCapture(capture)
+
+rawPosition = { x = 250, y = 125 }
+capture = { x = 100, y = 50 }
+InterfaceMouse.BeginScreenCapture(capture, 100, 50)
+capture.x, capture.y = 0, 0
+rawPosition = { x = 275, y = 150 }
+eventPosition = InterfaceMouse.GetPosition(capture, 0, 0)
+expect(eventPosition.x, 220, "screen capture accounts for OS scaling on x")
+expect(eventPosition.y, 120, "screen capture accounts for OS scaling on y")
+InterfaceMouse.EndCapture(capture)
+
 print("mouse_test: ok")

@@ -138,18 +138,32 @@ function Window.new(parent, options)
         self.titleDrag.clickthrough = false
 
         local dragStart = nil
+        local captureExpanded = false
 
         local function stopDrag()
             dragStart = nil
+            captureExpanded = false
+            InterfaceMouse.EndCapture(self.titleDrag)
             self.titleDrag:SetPos(self.root.x, self.root.y)
             self.titleDrag:SetSize(self.root.width - CLOSE_SIZE - 14, TITLE_HEIGHT)
             self:_SyncOverlays(false)
             return false
         end
 
-        local function moveDrag()
-            local mouse = InterfaceMouse.GetPosition()
+        local function moveDrag(component, x, y)
+            local mouse = InterfaceMouse.GetPosition(component, x, y)
             if dragStart and mouse then
+                if not captureExpanded then
+                    captureExpanded = true
+                    dragStart.mouseX = mouse.x
+                    dragStart.mouseY = mouse.y
+                    dragStart.windowX = self.root.x
+                    dragStart.windowY = self.root.y
+                    self.titleDrag:SetPos(0, 0)
+                    self.titleDrag:SetSize(0, 0, 1.0, 1.0)
+                    self.titleDrag:MoveToFront()
+                    return false
+                end
                 self.root:SetPos(
                     dragStart.windowX + mouse.x - dragStart.mouseX,
                     dragStart.windowY + mouse.y - dragStart.mouseY
@@ -158,20 +172,17 @@ function Window.new(parent, options)
             return false
         end
 
-        self.titleDrag:Subscribe(ui.Hook.ONCLICK, function()
-            local mouse = InterfaceMouse.GetPosition()
-            if mouse then
-                dragStart = {
-                    mouseX = mouse.x,
-                    mouseY = mouse.y,
-                    windowX = self.root.x,
-                    windowY = self.root.y,
-                }
-                self.root:MoveToFront()
-                self.titleDrag:MoveToFront()
-            end
-            self.titleDrag:SetPos(0, 0)
-            self.titleDrag:SetSize(0, 0, 1.0, 1.0)
+        self.titleDrag:Subscribe(ui.Hook.ONCLICK, function(component, x, y)
+            InterfaceMouse.BeginScreenCapture(component, x, y)
+            local mouse = InterfaceMouse.GetPosition(component, x, y)
+            dragStart = {
+                mouseX = mouse and mouse.x or 0,
+                mouseY = mouse and mouse.y or 0,
+                windowX = self.root.x,
+                windowY = self.root.y,
+            }
+            self.root:MoveToFront()
+            self.titleDrag:MoveToFront()
             return false
         end)
         self.titleDrag:Subscribe(ui.Hook.ONHOLD, moveDrag)

@@ -100,8 +100,21 @@ ui = {
 package.loaded["src/fancy_button"] = {
     getSize = function(_, options) return options.width end,
 }
+local mouseCaptureOrigins = {}
 package.loaded["src/core/mouse"] = {
-    GetPosition = function() return mousePosition end,
+    GetPosition = function(component, x, y)
+        if component and x ~= nil and y ~= nil then
+            local origin = mouseCaptureOrigins[component] or component
+            return { x = origin.x + x, y = origin.y + y }
+        end
+        return mousePosition
+    end,
+    BeginCapture = function(component)
+        mouseCaptureOrigins[component] = { x = component.x, y = component.y }
+    end,
+    EndCapture = function(component)
+        mouseCaptureOrigins[component] = nil
+    end,
 }
 package.loaded["src/simple_button"] = {
     new = function(parent, _, _, options) return simpleButton(parent, options) end,
@@ -147,6 +160,20 @@ expect(standard:Open(), true, "a standard picker opens")
 expect(lastWindowOptions.height, 300, "the standard picker keeps its original height")
 expect(standard.alphaCanvas, nil, "the alpha slider is opt-in")
 
+mousePosition = { x = 1000, y = 1000 }
+standard.fieldHit.subscriptions[ui.Hook.ONCLICK](standard.fieldHit, 63, 63)
+expect(
+    standard.fieldMarkerVertical.x,
+    79,
+    "the field marker uses the hook's component-local x coordinate"
+)
+expect(
+    standard.fieldMarkerHorizontal.y,
+    75,
+    "the field marker uses the hook's component-local y coordinate"
+)
+standard.fieldHit.subscriptions[ui.Hook.ONRELEASE](standard.fieldHit, 63, 63)
+
 local accepted
 local picker = ColourPicker.new(parent, {
     value = 0x33669980,
@@ -173,14 +200,15 @@ expect(
 expect(picker.alphaMarker.x, 79, "the alpha marker reflects the initial alpha")
 
 local contentX = picker.pickerWindow.root.x + picker.pickerWindow.content.x
-mousePosition = { x = contentX + 16 + 127, y = 0 }
-picker.alphaHit.subscriptions[ui.Hook.ONCLICK]()
+mousePosition = { x = contentX, y = 0 }
+picker.alphaHit.subscriptions[ui.Hook.ONCLICK](picker.alphaHit, 127, 12)
 expect(picker.dragTarget, "alpha", "pressing the alpha bar begins an alpha drag")
+expect(picker.alphaHit.width, 128, "the hit area remains stable on the initial click")
+picker.alphaHit.subscriptions[ui.Hook.ONHOLD](picker.alphaHit, 127, 12)
 expect(picker.alphaHit.width, 0, "the drag target expands across the picker")
 expect(picker.pendingColour, 0x336699FF, "the right edge selects full opacity")
 
-mousePosition.x = contentX + 16
-picker.alphaHit.subscriptions[ui.Hook.ONRELEASE]()
+picker.alphaHit.subscriptions[ui.Hook.ONRELEASE](picker.alphaHit, 0, 12)
 expect(picker.dragTarget, nil, "releasing the alpha bar ends the drag")
 expect(picker.alphaHit.x, 16, "the alpha hit area returns to the bar")
 expect(picker.alphaHit.width, 128, "the alpha hit area restores its width")

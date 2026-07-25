@@ -160,13 +160,13 @@ function List.new(parent, options)
     end)
 
     local dragStart = nil
-    self.thumb:Subscribe(ui.Hook.ONCLICK, function()
-        local mouse = InterfaceMouse.GetPosition()
+    self.thumb:Subscribe(ui.Hook.ONCLICK, function(component, x, y)
+        local mouse = InterfaceMouse.GetPosition(component, x, y)
         if mouse then dragStart = { mouseY = mouse.y, scrollY = self.scrollY } end
         return false
     end)
-    self.thumb:Subscribe(ui.Hook.ONHOLD, function()
-        local mouse = InterfaceMouse.GetPosition()
+    self.thumb:Subscribe(ui.Hook.ONHOLD, function(component, x, y)
+        local mouse = InterfaceMouse.GetPosition(component, x, y)
         local maxScroll = math.max(0, self.contentHeight - self:_ViewportHeight())
         local travel = self.track.height - self.thumbHeight
         if dragStart and mouse and maxScroll > 0 and travel > 0 then

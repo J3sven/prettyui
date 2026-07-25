@@ -141,9 +141,10 @@ function Slider.new(parent, options)
         self:_UpdateState()
         return true
     end)
-    self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function()
+    self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function(component, x, y)
         if self.disabled then return false end
-        local mouse = InterfaceMouse.GetPosition()
+        InterfaceMouse.BeginCapture(component)
+        local mouse = InterfaceMouse.GetPosition(component, x, y)
         self.thumbPressed = true
         if mouse then self.dragStart = { mouseX = mouse.x, value = self.value } end
         self.thumbDrag:SetPos(0, 0)
@@ -152,11 +153,11 @@ function Slider.new(parent, options)
         self:_UpdateState()
         return false
     end)
-    self.thumbDrag:Subscribe(ui.Hook.ONHOLD, function()
-        return self:_UpdateDrag()
+    self.thumbDrag:Subscribe(ui.Hook.ONHOLD, function(component, x, y)
+        return self:_UpdateDrag(component, x, y)
     end)
-    self.thumbDrag:Subscribe(ui.Hook.ONDRAG, function()
-        return self:_UpdateDrag()
+    self.thumbDrag:Subscribe(ui.Hook.ONDRAG, function(component, x, y)
+        return self:_UpdateDrag(component, x, y)
     end)
     self.thumbDrag:Subscribe(ui.Hook.ONRELEASE, function()
         return self:_StopDrag()
@@ -264,8 +265,8 @@ function Slider:_LayoutThumbDrag()
     self.thumbDrag:SetSize(THUMB_WIDTH, THUMB_HEIGHT)
 end
 
-function Slider:_UpdateDrag()
-    local mouse = InterfaceMouse.GetPosition()
+function Slider:_UpdateDrag(component, x, y)
+    local mouse = InterfaceMouse.GetPosition(component, x, y)
     if self.disabled or self.dragStart == nil or mouse == nil then return false end
     local travel = math.max(1, self.track.width - THUMB_WIDTH)
     local range = self.max - self.min
@@ -274,6 +275,7 @@ function Slider:_UpdateDrag()
 end
 
 function Slider:_StopDrag()
+    InterfaceMouse.EndCapture(self.thumbDrag)
     self.dragStart = nil
     self.thumbPressed = false
     self.thumbHovered = false

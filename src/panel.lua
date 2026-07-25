@@ -164,16 +164,16 @@ local function createDragLayer(parent, surface, panel)
     layer.enabled = false
     layer.hidden = true
 
-    layer:Subscribe(ui.Hook.ONCLICK, function()
+    layer:Subscribe(ui.Hook.ONCLICK, function(component, x, y)
         if not isAltDown() then return true end
-        panel:_BeginDrag(surface)
+        panel:_BeginDrag(surface, component, x, y)
         return false
     end)
-    layer:Subscribe(ui.Hook.ONHOLD, function()
-        return panel:_MoveDrag()
+    layer:Subscribe(ui.Hook.ONHOLD, function(component, x, y)
+        return panel:_MoveDrag(component, x, y)
     end)
-    layer:Subscribe(ui.Hook.ONDRAG, function()
-        return panel:_MoveDrag()
+    layer:Subscribe(ui.Hook.ONDRAG, function(component, x, y)
+        return panel:_MoveDrag(component, x, y)
     end)
     layer:Subscribe(ui.Hook.ONRELEASE, function()
         return panel:_StopDrag()
@@ -350,32 +350,43 @@ function Panel:_SetAltDragActive(active)
     end
 end
 
-function Panel:_BeginDrag(surface)
-    local mouse = InterfaceMouse.GetPosition()
-    if surface ~= self.altDragSurface or not mouse or not isAltDown() then return false end
+function Panel:_BeginDrag(surface, component, x, y)
+    if surface ~= self.altDragSurface or not isAltDown() then return false end
+    InterfaceMouse.BeginCapture(component)
+    local mouse = InterfaceMouse.GetPosition(component, x, y)
+    if not mouse then
+        InterfaceMouse.EndCapture(component)
+        return false
+    end
     self.dragState = {
         surface = surface,
         mouseX = mouse.x,
         mouseY = mouse.y,
         panelX = surface.root.x,
         panelY = surface.root.y,
+        captureExpanded = false,
     }
     surface.root:MoveToFront()
-    local dragLayer = surface == self.overlay and self.overlayDragLayer or self.dockDragLayer
-    if dragLayer then
-        dragLayer:SetPos(0, 0)
-        dragLayer:SetSize(0, 0, 1.0, 1.0)
-        dragLayer:MoveToFront()
-    end
     return false
 end
 
-function Panel:_MoveDrag()
+function Panel:_MoveDrag(component, x, y)
     if not self.dragState then return false end
     if not isAltDown() then return self:_StopDrag() end
-    local mouse = InterfaceMouse.GetPosition()
+    local mouse = InterfaceMouse.GetPosition(component, x, y)
     if mouse then
         local drag = self.dragState
+        if not drag.captureExpanded then
+            drag.captureExpanded = true
+            drag.mouseX = mouse.x
+            drag.mouseY = mouse.y
+            drag.panelX = drag.surface.root.x
+            drag.panelY = drag.surface.root.y
+            component:SetPos(0, 0)
+            component:SetSize(0, 0, 1.0, 1.0)
+            component:MoveToFront()
+            return false
+        end
         drag.surface.root:SetPos(
             drag.panelX + mouse.x - drag.mouseX,
             drag.panelY + mouse.y - drag.mouseY
@@ -386,9 +397,10 @@ end
 
 function Panel:_StopDrag()
     local surface = self.dragState and self.dragState.surface or nil
+    local dragLayer = surface == self.overlay and self.overlayDragLayer or self.dockDragLayer
+    InterfaceMouse.EndCapture(dragLayer)
     self.dragState = nil
     if surface then
-        local dragLayer = surface == self.overlay and self.overlayDragLayer or self.dockDragLayer
         if dragLayer then
             dragLayer:SetPos(surface.root.x, surface.root.y)
             dragLayer:SetSize(surface.root.width, surface.root.height)
