@@ -1,5 +1,6 @@
 local TextField = require("src/text_field")
 local RibbonBar = require("src/ribbon_bar")
+local BuffBar = require("src/buff_bar")
 
 local resources = Plugin.resources
 TextField.SetDefaultSprite(resources and (resources.input_default or resources["input_default.png"]))
@@ -32,6 +33,7 @@ local PrettyUI = {
     Tooltip = require("src/tooltip"),
     Window = require("src/window"),
     Scrollbar = require("src/scrollbar"),
+    BuffBar = BuffBar,
 }
 
 PrettyUI.version = "0.1.0"
@@ -40,6 +42,7 @@ RibbonBar.Start()
 
 function PluginShutdown()
     RibbonBar.Shutdown()
+    BuffBar.Shutdown()
 end
 
 return PrettyUI
