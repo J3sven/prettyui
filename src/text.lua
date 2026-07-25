@@ -7,7 +7,7 @@ local Text = {}
 local DEFAULT_TEXT_COLOUR = 0xE7D7B0FF
 local DEFAULT_TITLE_COLOUR = 0xF2C66DFF
 local BODY_FONT = id.Font.MUSEO_SANS_15PT_REGULAR
-local TITLE_FONT = id.Font.CINZEL_18PT_BOLD
+local TITLE_FONT = id.Font.CINZEL_13PT_BOLD
 local BODY_GAP = 2
 local TITLE_GAP = 8
 local TITLE_MARGIN_TOP = 16
@@ -18,7 +18,7 @@ local function fontConfig(fontID, isTitle)
         local succeeded, font = pcall(function() return config.Font.FromID(fontID) end)
         if succeeded and font ~= nil then return font end
     end
-    return isTitle and config.Font.CINZEL_18PT_BOLD or config.Font.MUSEO_SANS_15PT_REGULAR
+    return isTitle and config.Font.CINZEL_13PT_BOLD or config.Font.MUSEO_SANS_15PT_REGULAR
 end
 
 local function lineHeight(font, options)

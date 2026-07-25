@@ -10,7 +10,7 @@ local PART_WIDTH = 25
 local HEIGHT = 27
 local MIN_WIDTH = PART_WIDTH * 3
 local TEXT_PADDING = 12
-local FONT = id.Font.CINZEL_18PT_BOLD
+local FONT = id.Font.CINZEL_13PT_BOLD
 local TEXT_COLOURS = {
     neutral = 0xC8F1FFFF,
     positive = 0x372D1EFF,
@@ -33,7 +33,7 @@ end
 
 local function measureText(text)
     local succeeded, width = pcall(function()
-        return config.Font.CINZEL_18PT_BOLD:GetStringWidth(text, false)
+        return config.Font.CINZEL_13PT_BOLD:GetStringWidth(text, false)
     end)
     return succeeded and width or #text * 9
 end
