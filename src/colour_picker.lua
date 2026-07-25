@@ -18,6 +18,12 @@ local FIELD_Y = 12
 local HUE_WIDTH = 24
 local HUE_X = 156
 local HUE_Y = FIELD_Y
+local ALPHA_WIDTH = FIELD_SIZE
+local ALPHA_HEIGHT = 24
+local ALPHA_X = FIELD_X
+local ALPHA_Y = FIELD_Y + FIELD_SIZE + 12
+local ALPHA_LAYOUT_OFFSET = ALPHA_HEIGHT + 12
+local ALPHA_CHECKER_SIZE = 8
 local PREVIEW_BUTTON_SIZE = 64
 local PREVIEW_SWATCH_SIZE = math.floor(PREVIEW_BUTTON_SIZE * SWATCH_PROPORTION)
 local PREVIEW_X = 70
@@ -27,6 +33,8 @@ local MARKER_SIZE = 9
 local WHITE = 0xFFFFFFFF
 local BLACK = 0x000000FF
 local FRAME_COLOUR = 0x716B61FF
+local CHECKER_LIGHT = 0xA8A8A8FF
+local CHECKER_DARK = 0x606060FF
 
 local HUE_COLOURS = {
     0xFF0000FF,
@@ -142,6 +150,7 @@ function ColourPicker.new(parent, options)
     self.options = copyOptions(options)
     self.onChange = options.onChange
     self.disabled = options.disabled == true
+    self.alphaSlider = options.alphaSlider == true or options.showAlpha == true
     self.colour = normaliseColour(
         options.value or options.colour or options.defaultColour
     )
@@ -182,13 +191,15 @@ function ColourPicker.new(parent, options)
 end
 
 function ColourPicker:_PickerWindowBounds()
+    local minimumHeight = WINDOW_HEIGHT +
+        (self.alphaSlider and ALPHA_LAYOUT_OFFSET or 0)
     local width = math.max(
         WINDOW_WIDTH,
         math.floor(self.options.windowWidth or WINDOW_WIDTH)
     )
     local height = math.max(
-        WINDOW_HEIGHT,
-        math.floor(self.options.windowHeight or WINDOW_HEIGHT)
+        minimumHeight,
+        math.floor(self.options.windowHeight or minimumHeight)
     )
     local x = self.options.windowX or self.options.pickerX
     local y = self.options.windowY or self.options.pickerY
@@ -202,6 +213,10 @@ function ColourPicker:_PickerWindowBounds()
         end
     end
     return x or 80, y or 80, width, height
+end
+
+function ColourPicker:_PickerYOffset()
+    return self.alphaSlider and ALPHA_LAYOUT_OFFSET or 0
 end
 
 function ColourPicker:_DrawHueSpectrum()
@@ -228,6 +243,40 @@ function ColourPicker:_DrawColourField()
     end
 end
 
+function ColourPicker:_DrawAlphaCheckerboard()
+    if self.alphaCheckerCanvas == nil then return end
+    self.alphaCheckerCanvas:Clear()
+    for y = 0, ALPHA_HEIGHT - 1, ALPHA_CHECKER_SIZE do
+        for x = 0, ALPHA_WIDTH - 1, ALPHA_CHECKER_SIZE do
+            local light = (math.floor(x / ALPHA_CHECKER_SIZE) +
+                math.floor(y / ALPHA_CHECKER_SIZE)) % 2 == 0
+            self.alphaCheckerCanvas:AddRectangle(
+                x,
+                y,
+                math.min(ALPHA_CHECKER_SIZE, ALPHA_WIDTH - x),
+                math.min(ALPHA_CHECKER_SIZE, ALPHA_HEIGHT - y),
+                light and CHECKER_LIGHT or CHECKER_DARK
+            )
+        end
+    end
+end
+
+function ColourPicker:_DrawAlphaSpectrum()
+    if self.alphaCanvas == nil then return end
+    self.alphaCanvas:Clear()
+    local red, green, blue = hsvToRgb(
+        self.pendingHue, self.pendingSaturation, self.pendingValue
+    )
+    self.alphaCanvas:AddGradientH(
+        0,
+        0,
+        ALPHA_WIDTH,
+        ALPHA_HEIGHT,
+        packColour(red, green, blue, 0),
+        packColour(red, green, blue, 255)
+    )
+end
+
 function ColourPicker:_UpdatePickerVisuals(redrawField)
     self.pendingColour = hsvColour(
         self.pendingHue, self.pendingSaturation, self.pendingValue, self.pendingAlpha
@@ -250,6 +299,14 @@ function ColourPicker:_UpdatePickerVisuals(redrawField)
     local hueY = math.floor((1 - self.pendingHue) * (FIELD_SIZE - 1) + 0.5)
     self.hueMarkerShadow:SetY(HUE_Y + hueY - 2)
     self.hueMarker:SetY(HUE_Y + hueY - 1)
+    if self.alphaSlider then
+        self:_DrawAlphaSpectrum()
+        local alphaX = math.floor(
+            self.pendingAlpha / 255 * (ALPHA_WIDTH - 1) + 0.5
+        )
+        self.alphaMarkerShadow:SetX(ALPHA_X + alphaX - 2)
+        self.alphaMarker:SetX(ALPHA_X + alphaX - 1)
+    end
     self.preview.rgba = self.pendingColour
 end
 
@@ -292,11 +349,27 @@ function ColourPicker:_UpdateHueFromMouse()
     return false
 end
 
+function ColourPicker:_UpdateAlphaFromMouse()
+    local mouse = InterfaceMouse.GetPosition()
+    if mouse == nil then return false end
+    local contentX = self:_PickerContentPosition()
+    local ratio = clamp(
+        (mouse.x - contentX - ALPHA_X) / (ALPHA_WIDTH - 1), 0, 1
+    )
+    self.pendingAlpha = math.floor(ratio * 255 + 0.5)
+    self:_UpdatePickerVisuals(false)
+    return false
+end
+
 function ColourPicker:_BeginPickerDrag(kind)
     self.dragTarget = kind
-    local layer = kind == "hue" and self.hueHit or self.fieldHit
+    local layer = self.fieldHit
     if kind == "hue" then
+        layer = self.hueHit
         self:_UpdateHueFromMouse()
+    elseif kind == "alpha" then
+        layer = self.alphaHit
+        self:_UpdateAlphaFromMouse()
     else
         self:_UpdateFieldFromMouse()
     end
@@ -309,6 +382,7 @@ end
 function ColourPicker:_UpdatePickerDrag(kind)
     if self.dragTarget ~= kind then return false end
     if kind == "hue" then return self:_UpdateHueFromMouse() end
+    if kind == "alpha" then return self:_UpdateAlphaFromMouse() end
     return self:_UpdateFieldFromMouse()
 end
 
@@ -321,6 +395,10 @@ function ColourPicker:_StopPickerDrag(kind)
     self.fieldHit:SetSize(FIELD_SIZE, FIELD_SIZE)
     self.hueHit:SetPos(HUE_X, HUE_Y)
     self.hueHit:SetSize(HUE_WIDTH, FIELD_SIZE)
+    if self.alphaHit then
+        self.alphaHit:SetPos(ALPHA_X, ALPHA_Y)
+        self.alphaHit:SetSize(ALPHA_WIDTH, ALPHA_HEIGHT)
+    end
     return false
 end
 
@@ -339,12 +417,17 @@ function ColourPicker:_ClearPickerReferences()
     self.pickerWindow = nil
     self.fieldCanvas = nil
     self.hueCanvas = nil
+    self.alphaCheckerCanvas = nil
+    self.alphaCanvas = nil
     self.fieldHit = nil
     self.hueHit = nil
+    self.alphaHit = nil
     self.fieldMarkerHorizontal = nil
     self.fieldMarkerVertical = nil
     self.hueMarkerShadow = nil
     self.hueMarker = nil
+    self.alphaMarkerShadow = nil
+    self.alphaMarker = nil
     self.previewButton = nil
     self.preview = nil
     self.acceptButton = nil
@@ -359,6 +442,7 @@ function ColourPicker:Open()
 
     local Window = require("src/window")
     local pickerX, pickerY, pickerWidth, pickerHeight = self:_PickerWindowBounds()
+    local pickerYOffset = self:_PickerYOffset()
     local picker
     picker = Window.new(self.windowParent, {
         title = self.options.windowTitle or self.options.title or "Colour picker",
@@ -367,7 +451,7 @@ function ColourPicker:Open()
         width = pickerWidth,
         height = pickerHeight,
         minWidth = WINDOW_WIDTH,
-        minHeight = WINDOW_HEIGHT,
+        minHeight = WINDOW_HEIGHT + pickerYOffset,
         destroyOnClose = true,
         onClose = function()
             if self.pickerWindow == picker then self:_ClearPickerReferences() end
@@ -386,12 +470,36 @@ function ColourPicker:Open()
     self.hueCanvas.clickthrough = true
     self:_DrawHueSpectrum()
 
+    if self.alphaSlider then
+        self.alphaCheckerCanvas = ui.Canvas.new(picker.content)
+        self.alphaCheckerCanvas:SetPos(ALPHA_X, ALPHA_Y)
+        self.alphaCheckerCanvas:SetSize(ALPHA_WIDTH, ALPHA_HEIGHT)
+        self.alphaCheckerCanvas.clickthrough = true
+        self:_DrawAlphaCheckerboard()
+
+        self.alphaCanvas = ui.Canvas.new(picker.content)
+        self.alphaCanvas:SetPos(ALPHA_X, ALPHA_Y)
+        self.alphaCanvas:SetSize(ALPHA_WIDTH, ALPHA_HEIGHT)
+        self.alphaCanvas.clickthrough = true
+    end
+
     rectangle(
         picker.content, FIELD_X, FIELD_Y, FIELD_SIZE, FIELD_SIZE, FRAME_COLOUR, false
     )
     rectangle(
         picker.content, HUE_X, HUE_Y, HUE_WIDTH, FIELD_SIZE, FRAME_COLOUR, false
     )
+    if self.alphaSlider then
+        rectangle(
+            picker.content,
+            ALPHA_X,
+            ALPHA_Y,
+            ALPHA_WIDTH,
+            ALPHA_HEIGHT,
+            FRAME_COLOUR,
+            false
+        )
+    end
 
     self.fieldMarkerHorizontal = rectangle(
         picker.content, FIELD_X, FIELD_Y, MARKER_SIZE, 1, WHITE
@@ -405,6 +513,14 @@ function ColourPicker:Open()
     self.hueMarker = rectangle(
         picker.content, HUE_X - 3, HUE_Y, HUE_WIDTH + 6, 2, WHITE
     )
+    if self.alphaSlider then
+        self.alphaMarkerShadow = rectangle(
+            picker.content, ALPHA_X, ALPHA_Y - 3, 4, ALPHA_HEIGHT + 6, BLACK
+        )
+        self.alphaMarker = rectangle(
+            picker.content, ALPHA_X, ALPHA_Y - 3, 2, ALPHA_HEIGHT + 6, WHITE
+        )
+    end
 
     self.previewButton = picker:AddSimpleButton(
         Sprites.CLOSE,
@@ -412,7 +528,7 @@ function ColourPicker:Open()
         {
             absolute = true,
             x = PREVIEW_X,
-            y = PREVIEW_Y,
+            y = PREVIEW_Y + pickerYOffset,
             width = PREVIEW_BUTTON_SIZE,
             height = PREVIEW_BUTTON_SIZE,
         }
@@ -443,8 +559,15 @@ function ColourPicker:Open()
     self.hueHit:SetPos(HUE_X, HUE_Y)
     self.hueHit:SetSize(HUE_WIDTH, FIELD_SIZE)
     self.hueHit.clickthrough = false
+    if self.alphaSlider then
+        self.alphaHit = ui.Layer.new(picker.content)
+        self.alphaHit:SetPos(ALPHA_X, ALPHA_Y)
+        self.alphaHit:SetSize(ALPHA_WIDTH, ALPHA_HEIGHT)
+        self.alphaHit.clickthrough = false
+    end
     self:_BindPickerDrag(self.fieldHit, "field")
     self:_BindPickerDrag(self.hueHit, "hue")
+    if self.alphaHit then self:_BindPickerDrag(self.alphaHit, "alpha") end
 
     local acceptText = self.options.acceptText or "Accept"
     local acceptWidth = FancyButton.getSize(acceptText, {
@@ -456,7 +579,7 @@ function ColourPicker:Open()
     end, {
         absolute = true,
         x = math.floor((picker.content.width - acceptWidth) / 2),
-        y = ACCEPT_Y,
+        y = ACCEPT_Y + pickerYOffset,
         width = acceptWidth,
         variant = self.options.acceptVariant or "positive",
     })
@@ -464,6 +587,7 @@ function ColourPicker:Open()
     self:_SetPendingColour(self.colour)
     self.fieldHit:MoveToFront()
     self.hueHit:MoveToFront()
+    if self.alphaHit then self.alphaHit:MoveToFront() end
     return true
 end
 
