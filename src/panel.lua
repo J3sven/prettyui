@@ -3,6 +3,7 @@ local ColourPicker = require("src/colour_picker")
 local ComboBox = require("src/combo_box")
 local ContentMethods = require("src/core/content_methods")
 local Cursor = require("src/core/cursor")
+local InterfaceMouse = require("src/core/mouse")
 local List = require("src/list")
 local Layout = require("src/core/layout")
 local Slider = require("src/slider")
@@ -350,7 +351,7 @@ function Panel:_SetAltDragActive(active)
 end
 
 function Panel:_BeginDrag(surface)
-    local mouse = Mouse.GetPosition()
+    local mouse = InterfaceMouse.GetPosition()
     if surface ~= self.altDragSurface or not mouse or not isAltDown() then return false end
     self.dragState = {
         surface = surface,
@@ -372,7 +373,7 @@ end
 function Panel:_MoveDrag()
     if not self.dragState then return false end
     if not isAltDown() then return self:_StopDrag() end
-    local mouse = Mouse.GetPosition()
+    local mouse = InterfaceMouse.GetPosition()
     if mouse then
         local drag = self.dragState
         drag.surface.root:SetPos(

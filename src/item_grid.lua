@@ -1,4 +1,5 @@
 local ItemSlot = require("src/item_slot")
+local InterfaceMouse = require("src/core/mouse")
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
@@ -105,7 +106,7 @@ end
 
 function ItemGrid:_UpdateDrag()
     if self.dragSourceIndex == nil then return false end
-    local mouse = Mouse.GetPosition()
+    local mouse = InterfaceMouse.GetPosition()
     if mouse and self.dragSprite then
         self.dragSprite:SetPos(
             math.floor(mouse.x - (self.dragSprite.width or 0) / 2),

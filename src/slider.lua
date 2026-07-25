@@ -2,6 +2,7 @@ local Cursor = require("src/core/cursor")
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
+local InterfaceMouse = require("src/core/mouse")
 
 local Slider = {}
 Slider.__index = Slider
@@ -142,7 +143,7 @@ function Slider.new(parent, options)
     end)
     self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function()
         if self.disabled then return false end
-        local mouse = Mouse.GetPosition()
+        local mouse = InterfaceMouse.GetPosition()
         self.thumbPressed = true
         if mouse then self.dragStart = { mouseX = mouse.x, value = self.value } end
         self.thumbDrag:SetPos(0, 0)
@@ -264,7 +265,7 @@ function Slider:_LayoutThumbDrag()
 end
 
 function Slider:_UpdateDrag()
-    local mouse = Mouse.GetPosition()
+    local mouse = InterfaceMouse.GetPosition()
     if self.disabled or self.dragStart == nil or mouse == nil then return false end
     local travel = math.max(1, self.track.width - THUMB_WIDTH)
     local range = self.max - self.min

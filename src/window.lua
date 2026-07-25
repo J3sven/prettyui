@@ -3,6 +3,7 @@ local ContentMethods = require("src/core/content_methods")
 local Text = require("src/text")
 local Tooltip = require("src/tooltip")
 local Layout = require("src/core/layout")
+local InterfaceMouse = require("src/core/mouse")
 
 local Window = {}
 Window.__index = Window
@@ -43,7 +44,6 @@ function Window.new(parent, options)
     self.minHeight = options.minHeight or MIN_HEIGHT
     self.maxWidth = options.maxWidth
     self.maxHeight = options.maxHeight
-    self.interfaceScaleSetting = game.options.InterfaceScale.setting
     self.overlays = {}
 
     self.root = ui.Layer.new(parent)
@@ -148,7 +148,7 @@ function Window.new(parent, options)
         end
 
         local function moveDrag()
-            local mouse = Mouse.GetPosition()
+            local mouse = InterfaceMouse.GetPosition()
             if dragStart and mouse then
                 self.root:SetPos(
                     dragStart.windowX + mouse.x - dragStart.mouseX,
@@ -159,7 +159,7 @@ function Window.new(parent, options)
         end
 
         self.titleDrag:Subscribe(ui.Hook.ONCLICK, function()
-            local mouse = Mouse.GetPosition()
+            local mouse = InterfaceMouse.GetPosition()
             if mouse then
                 dragStart = {
                     mouseX = mouse.x,

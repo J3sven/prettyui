@@ -1,4 +1,5 @@
 local FancyButton = require("src/fancy_button")
+local InterfaceMouse = require("src/core/mouse")
 local SimpleButton = require("src/simple_button")
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
@@ -266,7 +267,7 @@ function ColourPicker:_PickerContentPosition()
 end
 
 function ColourPicker:_UpdateFieldFromMouse()
-    local mouse = Mouse.GetPosition()
+    local mouse = InterfaceMouse.GetPosition()
     if mouse == nil then return false end
     local contentX, contentY = self:_PickerContentPosition()
     self.pendingValue = clamp(
@@ -280,7 +281,7 @@ function ColourPicker:_UpdateFieldFromMouse()
 end
 
 function ColourPicker:_UpdateHueFromMouse()
-    local mouse = Mouse.GetPosition()
+    local mouse = InterfaceMouse.GetPosition()
     if mouse == nil then return false end
     local _, contentY = self:_PickerContentPosition()
     local ratio = clamp((mouse.y - contentY - HUE_Y) / (FIELD_SIZE - 1), 0, 1)

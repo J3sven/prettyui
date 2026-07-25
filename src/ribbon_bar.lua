@@ -1,4 +1,5 @@
 local RibbonButton = require("src/ribbon_button")
+local InterfaceMouse = require("src/core/mouse")
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
 local Window = require("src/window")
@@ -116,7 +117,7 @@ local function hiddenOffset(width, height)
 end
 
 local function isHitboxHovered(width, height)
-    local mouse = Mouse.GetPosition()
+    local mouse = InterfaceMouse.GetPosition()
     if mouse == nil or gameArea == nil then return false end
 
     local gameX = gameArea.x or 0
