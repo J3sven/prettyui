@@ -21,6 +21,12 @@ local function component(parent, kind)
         self.width, self.height = width, height
         self.widthAnchor, self.heightAnchor = widthAnchor, heightAnchor
     end
+    function result:SetScrollSize(width, height)
+        self.scrollWidth, self.scrollHeight = width, height
+    end
+    function result:SetScrollPos(x, y)
+        self.scrollX, self.scrollY = x, y
+    end
     function result:Subscribe() end
     function result:MoveToFront() end
     function result:Destroy() self.destroyed = true end
@@ -39,7 +45,16 @@ ui = {
     Layer = componentFactory("layer"),
     Sprite = componentFactory("sprite"),
     Text = componentFactory("text"),
-    Hook = { ONMOUSEOVER = 1, ONMOUSELEAVE = 2, ONCLICK = 3 },
+    Hook = {
+        ONMOUSEOVER = 1,
+        ONMOUSELEAVE = 2,
+        ONCLICK = 3,
+        ONHOLD = 4,
+        ONDRAG = 5,
+        ONRELEASE = 6,
+        ONDRAGCOMPLETE = 7,
+        ONSCROLLWHEEL = 8,
+    },
     AlignMode = { CENTRE = 0 },
 }
 

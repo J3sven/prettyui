@@ -186,6 +186,7 @@ function List.new(parent, options)
     self.downArrow:Subscribe(ui.Hook.ONSCROLLWHEEL, onListWheel)
     self.track:Subscribe(ui.Hook.ONSCROLLWHEEL, onListWheel)
     self.thumb:Subscribe(ui.Hook.ONSCROLLWHEEL, onListWheel)
+    self.viewport:Subscribe(ui.Hook.ONSCROLLWHEEL, onListWheel)
 
     self.root:Subscribe(ui.Hook.ONSCROLLWHEEL, function(component, delta)
         return self:_OnScrollWheel(component, delta)
@@ -319,6 +320,9 @@ function List:_RebuildRows()
             visibleIndex = visibleIndex + 1
 
             local rowBackground = rectangle(row, entry.selected and self.selectedColour or 0x00000000)
+            rowBackground:Subscribe(ui.Hook.ONSCROLLWHEEL, function(component, delta)
+                return self:_OnScrollWheel(component, delta)
+            end)
             local left = 8
             if entry.icon ~= nil then
                 local iconSize = math.max(1, math.floor(16 * self.entryIconScale / 100))
@@ -327,6 +331,9 @@ function List:_RebuildRows()
                 icon:SetSize(iconSize, iconSize)
                 icon.spriteID = entry.icon
                 icon.clickthrough = true
+                icon:Subscribe(ui.Hook.ONSCROLLWHEEL, function(component, delta)
+                    return self:_OnScrollWheel(component, delta)
+                end)
                 left = 7 + iconSize + 6
             end
 
@@ -340,6 +347,12 @@ function List:_RebuildRows()
             label.maxLines = 1
             label.alignVertical = ui.AlignMode.CENTRE
             label.clickthrough = true
+            label:Subscribe(ui.Hook.ONSCROLLWHEEL, function(component, delta)
+                return self:_OnScrollWheel(component, delta)
+            end)
+            row:Subscribe(ui.Hook.ONSCROLLWHEEL, function(component, delta)
+                return self:_OnScrollWheel(component, delta)
+            end)
 
             if not self.disabled and entry.enabled then
                 row:Subscribe(ui.Hook.ONMOUSEOVER, function()
@@ -354,9 +367,6 @@ function List:_RebuildRows()
                     local selected = self.maxSelected > 1 and not entry.selected or true
                     self:_Select(entry, selected, true)
                     return false
-                end)
-                row:Subscribe(ui.Hook.ONSCROLLWHEEL, function(component, delta)
-                    return self:_OnScrollWheel(component, delta)
                 end)
                 Cursor.apply(row, config.Cursor.CURSOR_TICK, true)
             end
