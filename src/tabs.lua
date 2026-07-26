@@ -1,6 +1,7 @@
 local ContentMethods = require("src/core/content_methods")
 local Cursor = require("src/core/cursor")
 local Layout = require("src/core/layout")
+local Scroll = require("src/core/scroll")
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
@@ -283,21 +284,44 @@ local function configurePage(tabs, index, options)
     page.root:SetSize(0, 0, 1.0, 1.0)
     page.root.clickthrough = true
     page.root.hidden = true
-    page.content = page.root
-    page.contentWidth = tabs.root.width or DEFAULT_WIDTH
-    page._onScrollWheel = options._onScrollWheel
-    Layout.configure(page, options.contentLayout)
 
     local parentContext = tabs.tooltipContext
     local tooltipParent = parentContext and parentContext.parent or tabs.parent
+    local tab = tabs.tabs[index]
+    local scrollable = tab.scrollable
+    if scrollable == nil then scrollable = options.scrollable end
+    local contentHeight = tab.contentHeight
+    if contentHeight == nil then contentHeight = options.contentHeight end
+    Scroll.attach(page, page.root, {
+        width = 0,
+        height = 0,
+        widthAnchor = 1.0,
+        heightAnchor = 1.0,
+        contentHeight = contentHeight,
+        scrollable = scrollable,
+        scrollStep = options.scrollStep,
+        _onScrollWheel = options._onScrollWheel,
+        parentContext = parentContext,
+        overlayParent = tooltipParent,
+        isVisible = function() return page.root.hidden ~= true end,
+        position = function(scrollRoot)
+            local rootX = tabs.root.x or 0
+            local rootY = tabs.root.y or 0
+            if parentContext and parentContext.parentContext then
+                rootX, rootY = parentContext.parentContext.position(tabs.root)
+            end
+            return rootX + (tabs.content.x or 0) + (page.root.x or 0) +
+                    (scrollRoot.x or 0),
+                rootY + (tabs.content.y or 0) + (page.root.y or 0) +
+                    (scrollRoot.y or 0)
+        end,
+    })
+    Layout.configure(page, options.contentLayout)
+
     page.tooltipContext = Tooltip.registerContext(page.content, tooltipParent, function(target)
-        local rootX = tabs.root.x or 0
-        local rootY = tabs.root.y or 0
-        if parentContext and parentContext.parentContext then
-            rootX, rootY = parentContext.parentContext.position(tabs.root)
-        end
-        return rootX + (tabs.content.x or 0) + (target.x or 0),
-            rootY + (tabs.content.y or 0) + (target.y or 0)
+        local rootX, rootY = page._scroll:_AbsolutePosition()
+        return rootX + (target.x or 0),
+            rootY + (target.y or 0) - page._scroll.scrollY
     end, parentContext)
     return page
 end
@@ -313,6 +337,7 @@ function Tabs.new(parent, values, options)
     self.pages = {}
     self.activeIndex = nil
     self.onChange = options.onChange
+    self.scrollable = options.scrollable ~= false
     self.tabGap = math.max(0, math.floor(options.tabGap or DEFAULT_TAB_GAP))
     self.tabInset = math.max(0, math.floor(options.tabInset or 0))
 
@@ -369,7 +394,10 @@ function Tabs:SetActive(index, notify)
     if tab == nil or tab.disabled then return false end
     local previous = self.activeIndex
     self.activeIndex = index
-    for pageIndex, page in ipairs(self.pages) do page.root.hidden = pageIndex ~= index end
+    for pageIndex, page in ipairs(self.pages) do
+        page.root.hidden = pageIndex ~= index
+        page._scroll:Refresh()
+    end
     for _, entry in ipairs(self.tabs) do self:_UpdateTab(entry) end
     self:_RefreshZOrder()
     if notify ~= false and previous ~= index and self.onChange then
@@ -409,11 +437,17 @@ function Tabs:SetDisabled(index, disabled)
     return true
 end
 
+function Tabs:SetScrollable(scrollable)
+    self.scrollable = scrollable ~= false
+    for _, page in ipairs(self.pages) do page:SetScrollable(self.scrollable) end
+end
+
 function Tabs:Destroy()
     if self.root then Tooltip.unregisterContext(self.root) end
     for _, page in ipairs(self.pages) do
         if page.content then Tooltip.unregisterContext(page.content) end
         Layout.destroyManaged(page)
+        if page._scroll then page._scroll:Destroy() page._scroll = nil end
     end
     self.pages = {}
     self.tabs = {}
@@ -429,5 +463,6 @@ ContentMethods.installSingle(TabPage, {
         AddTabs = true,
     },
 })
+Scroll.install(TabPage)
 
 return Tabs

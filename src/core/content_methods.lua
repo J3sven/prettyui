@@ -3,7 +3,7 @@ local Layout = require("src/core/layout")
 local ContentMethods = {}
 
 -- Component hosts all expose the same Add... API, but differ in how many concrete
--- components they create. Windows, scrollbars, and tab pages create one; panels
+-- components they create. Windows, simple views, and tab pages create one; panels
 -- create a dock/popout pair. This registry keeps component construction and flow
 -- defaults in one place so adding a component does not require copying a method
 -- into every host.

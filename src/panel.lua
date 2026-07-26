@@ -6,6 +6,7 @@ local Cursor = require("src/core/cursor")
 local InterfaceMouse = require("src/core/mouse")
 local List = require("src/list")
 local Layout = require("src/core/layout")
+local Scroll = require("src/core/scroll")
 local Slider = require("src/slider")
 local TextField = require("src/text_field")
 local Tabs = require("src/tabs")
@@ -14,6 +15,10 @@ local Wheel = require("src/core/wheel")
 
 local Panel = {}
 Panel.__index = Panel
+
+local PanelContent = {}
+PanelContent.__index = PanelContent
+Scroll.install(PanelContent)
 
 local BORDER_SIZE = 4
 local TOGGLE_SIZE = 20
@@ -100,11 +105,11 @@ local function createSurface(parent, options)
     surface.bottomLeft:SetPos(0, -BORDER_SIZE, 0, 1.0)
     surface.bottomLeft:SetSize(BORDER_SIZE, BORDER_SIZE)
 
-    surface.content = ui.Layer.new(surface.root)
-    surface.content:SetPos(BORDER_SIZE, BORDER_SIZE)
-    surface.content:SetSize(-BORDER_SIZE * 2, -BORDER_SIZE * 2, 1.0, 1.0)
-    surface.content.clickthrough = options.clickthrough == true
-    surface.content.enabled = options.clickthrough ~= true
+    surface.container = ui.Layer.new(surface.root)
+    surface.container:SetPos(BORDER_SIZE, BORDER_SIZE)
+    surface.container:SetSize(-BORDER_SIZE * 2, -BORDER_SIZE * 2, 1.0, 1.0)
+    surface.container.clickthrough = options.clickthrough == true
+    surface.container.enabled = options.clickthrough ~= true
 
     return surface
 end
@@ -213,12 +218,32 @@ local function pairObjects(panel, dock, overlay)
     })
 end
 
-local function configureOwner(surface, options)
-    local owner = {
-        content = surface.content,
-        contentWidth = surface.root.width - BORDER_SIZE * 2,
+local function configureOwner(surface, options, context, overlayParent)
+    local owner = setmetatable({}, PanelContent)
+    local scroll = Scroll.attach(owner, surface.container, {
+        width = 0,
+        height = 0,
+        widthAnchor = 1.0,
+        heightAnchor = 1.0,
+        contentHeight = options.contentHeight,
+        scrollable = options.scrollable,
+        scrollStep = options.scrollStep,
         _onScrollWheel = options._onScrollWheel,
-    }
+        clickthrough = surface.root.clickthrough == true,
+        parentContext = context,
+        overlayParent = overlayParent,
+        isVisible = function() return surface.root.hidden ~= true end,
+        position = function(scrollRoot)
+            local rootX = surface.root.x or 0
+            local rootY = surface.root.y or 0
+            if context then rootX, rootY = context.position(surface.root) end
+            return rootX + (surface.container.x or 0) + (scrollRoot.x or 0),
+                rootY + (surface.container.y or 0) + (scrollRoot.y or 0)
+        end,
+    })
+    surface.scroll = scroll
+    surface.viewport = scroll.viewport
+    surface.content = scroll.content
     Layout.configure(owner, options.layout or options.textLayout)
     return owner
 end
@@ -271,26 +296,25 @@ function Panel.new(parent, options, flowManaged)
         backgroundAlpha = self.popoutBackgroundAlpha,
         clickthrough = self.popoutClickthrough,
     })
+    local dockTooltipParent = parentContext and parentContext.parent or parent
+    self.dockOwner = configureOwner(self.dock, options, parentContext, dockTooltipParent)
+    self.overlayOwner = configureOwner(self.overlay, options, nil, overlayParent)
     self.root = self.dock.root
     self.content = self.dock.content
     self.overlayContent = self.overlay.content
-    self.dockOwner = configureOwner(self.dock, options)
-    self.overlayOwner = configureOwner(self.overlay, options)
+    self.scrollable = self.dock.scroll.scrollable
     Wheel.bind(self.dock.root, options)
     Wheel.bind(self.dock.background, options)
-    Wheel.bind(self.dock.content, options)
 
-    local dockTooltipParent = parentContext and parentContext.parent or parent
     self.dockTooltipContext = Tooltip.registerContext(self.dock.content, dockTooltipParent, function(target)
-        local rootX = self.dock.root.x or 0
-        local rootY = self.dock.root.y or 0
-        if parentContext then rootX, rootY = parentContext.position(self.dock.root) end
-        return rootX + (self.dock.content.x or 0) + (target.x or 0),
-            rootY + (self.dock.content.y or 0) + (target.y or 0)
+        local rootX, rootY = self.dock.scroll:_AbsolutePosition()
+        return rootX + (target.x or 0),
+            rootY + (target.y or 0) - self.dock.scroll.scrollY
     end, parentContext)
     self.overlayTooltipContext = Tooltip.registerContext(self.overlay.content, overlayParent, function(target)
-        return (self.overlay.root.x or 0) + (self.overlay.content.x or 0) + (target.x or 0),
-            (self.overlay.root.y or 0) + (self.overlay.content.y or 0) + (target.y or 0)
+        local rootX, rootY = self.overlay.scroll:_AbsolutePosition()
+        return rootX + (target.x or 0),
+            rootY + (target.y or 0) - self.overlay.scroll.scrollY
     end, nil)
 
     if self._canPopout then
@@ -430,6 +454,8 @@ function Panel:SetPoppedOut(poppedOut, notify)
     self.dock.root.hidden = self.poppedOut
     self.overlay.root.hidden = not self.poppedOut
     self:_UpdateFlowHeight()
+    self.dock.scroll:Refresh()
+    self.overlay.scroll:Refresh()
     if self.poppedOut then self.overlay.root:MoveToFront() end
     self:_SetAltDragActive(isAltDown())
     if notify ~= false and previous ~= self.poppedOut and self.onPopoutChange then
@@ -445,8 +471,9 @@ function Panel:SetPopoutClickthrough(clickthrough)
     self.popoutClickthrough = clickthrough == true
     self.overlay.root.clickthrough = self.popoutClickthrough
     self.overlay.background.clickthrough = self.popoutClickthrough
-    self.overlay.content.clickthrough = self.popoutClickthrough
-    self.overlay.content.enabled = not self.popoutClickthrough
+    self.overlay.container.clickthrough = self.popoutClickthrough
+    self.overlay.container.enabled = not self.popoutClickthrough
+    self.overlay.scroll:SetClickthrough(self.popoutClickthrough)
 end
 
 function Panel:SetPopoutBackgroundAlpha(alpha)
@@ -463,6 +490,8 @@ function Panel:SetSize(width, height)
     self:_UpdateFlowHeight()
     self.dockOwner.contentWidth = self.contentWidth
     self.overlayOwner.contentWidth = self.contentWidth
+    self.dock.scroll:Refresh()
+    self.overlay.scroll:Refresh()
     if self.dragState == nil then
         if self.dockDragLayer then
             self.dockDragLayer:SetPos(self.dock.root.x, self.dock.root.y)
@@ -473,6 +502,14 @@ function Panel:SetSize(width, height)
             self.overlayDragLayer:SetSize(self.overlay.root.width, self.overlay.root.height)
         end
     end
+end
+
+function Panel:SetScrollable(scrollable)
+    self.dock.scroll:SetScrollable(scrollable)
+    self.overlay.scroll:SetScrollable(scrollable)
+    self.dockOwner.scrollable = self.dock.scroll.scrollable
+    self.overlayOwner.scrollable = self.overlay.scroll.scrollable
+    self.scrollable = self.dock.scroll.scrollable
 end
 
 -- Install the shared Add... API against both panel surfaces. The stateful methods
@@ -696,6 +733,14 @@ function Panel:Destroy()
     if self.overlay and self.overlay.content then Tooltip.unregisterContext(self.overlay.content) end
     if self.dockTooltip then self.dockTooltip:Destroy() self.dockTooltip = nil end
     if self.overlayTooltip then self.overlayTooltip:Destroy() self.overlayTooltip = nil end
+    if self.dock and self.dock.scroll then
+        self.dock.scroll:Destroy()
+        self.dock.scroll = nil
+    end
+    if self.overlay and self.overlay.scroll then
+        self.overlay.scroll:Destroy()
+        self.overlay.scroll = nil
+    end
     if self.dockDragLayer then self.dockDragLayer:Destroy() self.dockDragLayer = nil end
     if self.overlayDragLayer then
         self.overlayDragLayer:Destroy()

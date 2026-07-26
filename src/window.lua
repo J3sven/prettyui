@@ -4,6 +4,7 @@ local Text = require("src/text")
 local Tooltip = require("src/tooltip")
 local Layout = require("src/core/layout")
 local InterfaceMouse = require("src/core/mouse")
+local Scroll = require("src/core/scroll")
 
 local Window = {}
 Window.__index = Window
@@ -220,19 +221,36 @@ function Window.new(parent, options)
         return false
     end)
 
-    self.content = ui.Layer.new(self.root)
-    self.content:SetPos(BORDER, top)
-    self.content:SetSize(-BORDER * 2, -top - BORDER, 1.0, 1.0)
-    self.content.clickthrough = false
-    self.closeButton:MoveToFront()
     local parentTooltipContext = Tooltip.getContext(parent)
     local tooltipParent = parentTooltipContext and parentTooltipContext.parent or parent
+    Scroll.attach(self, self.root, {
+        x = BORDER,
+        y = top,
+        width = -BORDER * 2,
+        height = -top - BORDER,
+        widthAnchor = 1.0,
+        heightAnchor = 1.0,
+        contentHeight = options.contentHeight,
+        scrollable = options.scrollable,
+        scrollStep = options.scrollStep,
+        _onScrollWheel = options._onScrollWheel,
+        overlayParent = tooltipParent,
+        ownerWindow = self,
+        isVisible = function() return self.root.hidden ~= true end,
+        position = function(scrollRoot)
+            local rootX = self.root.x or 0
+            local rootY = self.root.y or 0
+            if parentTooltipContext then
+                rootX, rootY = parentTooltipContext.position(self.root)
+            end
+            return rootX + (scrollRoot.x or 0), rootY + (scrollRoot.y or 0)
+        end,
+    })
+    self.closeButton:MoveToFront()
     self.tooltipContext = Tooltip.registerContext(self.content, tooltipParent, function(target)
-        local rootX = self.root.x or 0
-        local rootY = self.root.y or 0
-        if parentTooltipContext then rootX, rootY = parentTooltipContext.position(self.root) end
-        return rootX + (self.content.x or 0) + (target.x or 0),
-            rootY + (self.content.y or 0) + (target.y or 0)
+        local rootX, rootY = self._scroll:_AbsolutePosition()
+        return rootX + (target.x or 0),
+            rootY + (target.y or 0) - self._scroll.scrollY
     end, parentTooltipContext)
     self.tooltipContext.ownerWindow = self
     Layout.configure(self, options.layout or options.textLayout)
@@ -246,7 +264,7 @@ function Window:SetSize(width, height)
         clamp(math.floor(width), self.minWidth, self.maxWidth),
         clamp(math.floor(height), self.minHeight, self.maxHeight)
     )
-    self.contentWidth = self.root.width - BORDER * 2
+    self._scroll:Refresh()
     self:_SyncOverlays(self.root.hidden == true)
 end
 
@@ -258,6 +276,7 @@ end
 -- A window is a standard single-surface content host. Component definitions and
 -- flow defaults live in content_methods rather than being repeated here.
 ContentMethods.installSingle(Window)
+Scroll.install(Window)
 
 function Window:_RegisterOverlay(component, isVisible, layout)
     self.overlays[component] = { isVisible = isVisible, layout = layout }
@@ -307,6 +326,12 @@ function Window:Destroy()
     if self.tooltip then
         self.tooltip:Destroy()
         self.tooltip = nil
+    end
+    if self._scroll then
+        self._scroll:Destroy()
+        self._scroll = nil
+        self.viewport = nil
+        self.content = nil
     end
     if self.root then
         self.root:Destroy()

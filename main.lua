@@ -33,6 +33,7 @@ local PrettyUI = {
     Tooltip = require("src/tooltip"),
     Window = require("src/window"),
     Scrollbar = require("src/scrollbar"),
+    SimpleView = require("src/simple_view"),
     BuffBar = BuffBar,
 }
 
