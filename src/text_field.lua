@@ -10,6 +10,7 @@ local DEFAULT_HEIGHT = 30
 local DEFAULT_TEXT_COLOUR = Palette.TEXT
 local DEFAULT_PLACEHOLDER_COLOUR = 0x99958DFF
 local INPUT_MARGIN = 8
+local CONTENT_TOP_INSET = 3
 local defaultInputSprite = nil
 
 function TextField.SetDefaultSprite(sprite)
@@ -45,7 +46,8 @@ function TextField.new(parent, options)
     self.root.inputMode = options.inputMode or ui.InputFieldKeyHandlingMode.DEFAULT
     self.root.emptyText = options.placeholder or options.emptyText or ""
     self.root.content = tostring(options.text or options.content or "")
-    self.root.contentMargin = options.contentMargin or ui.Margin.new(8, 0, 8, 0)
+    self.root.contentMargin = options.contentMargin
+        or ui.Margin.new(8, CONTENT_TOP_INSET, 8, 0)
     self.root.text.font = options.font or id.Font.MUSEO_SANS_15PT_REGULAR
     self.root.text.rgba = options.colour or options.color or DEFAULT_TEXT_COLOUR
     self.root.text.isShadowed = options.shadowed ~= false
