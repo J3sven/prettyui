@@ -421,6 +421,31 @@ function Handle:SetLabel(text, rgba)
     return true
 end
 
+function Handle:SetObject(value)
+    local entry = self._bar.entriesByID[self._id]
+    if entry == nil then return false end
+    local objectID = resolveObjId(value)
+    if value ~= nil then
+        objectID = math.tointeger(objectID)
+        if objectID == nil then return false end
+    end
+    entry.sprite.spriteID = -1
+    entry.sprite:SetAssociatedObject(objectID or -1)
+    return true
+end
+
+function Handle:SetSprite(spriteID)
+    local entry = self._bar.entriesByID[self._id]
+    if entry == nil then return false end
+    if spriteID ~= nil then
+        spriteID = math.tointeger(spriteID)
+        if spriteID == nil then return false end
+    end
+    entry.sprite:SetAssociatedObject(-1)
+    entry.sprite.spriteID = spriteID or -1
+    return true
+end
+
 function Handle:SetTooltip(value)
     local entry = self._bar.entriesByID[self._id]
     if entry == nil then return false end
@@ -555,11 +580,12 @@ end
 --                                display whole minutes at 60 seconds or more,
 --                                then seconds, and remove themselves at zero.
 --
--- Returned handles support SetVisible(visible), SetLabel(text, rgba), and
--- SetTooltip(value). They return false after removal. Passing nil to SetTooltip
--- removes the tooltip; a later non-nil value adds it again. Timed entries own
--- their label, so SetLabel returns false for them; hiding an entry does not
--- pause its duration.
+-- Returned handles support SetVisible(visible), SetLabel(text, rgba),
+-- SetObject(objId), SetSprite(spriteID), and SetTooltip(value). They return
+-- false after removal. SetObject and SetSprite switch the icon source and
+-- accept nil to clear it. Passing nil to SetTooltip removes the tooltip; a
+-- later non-nil value adds it again. Timed entries own their label, so SetLabel
+-- returns false for them; hiding an entry does not pause its duration.
 function BuffBar.addBuff(options)
     return add(bars.buff, options)
 end

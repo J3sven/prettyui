@@ -103,6 +103,7 @@ local function component(parent, kind)
     end
     function result:SetAssociatedObject(objectID)
         self.objectID = objectID
+        self.associatedObjectID = objectID
     end
     function result:Destroy()
         self.destroyed = true
@@ -227,6 +228,16 @@ expect(first.background.height, first.border.height - 2, "the background stays v
 expect(firstHandle:SetLabel("99%", 0xABCDEF12), true, "untimed labels can be updated")
 expect(first.label.content, "99%", "SetLabel updates label content")
 expect(first.label.rgba, 0xABCDEF12, "SetLabel can update label colour")
+expect(firstHandle:SetSprite(123), true, "buff handles can switch to a raw sprite")
+expect(first.sprite.associatedObjectID, -1, "SetSprite clears associated object artwork")
+expect(first.sprite.spriteID, 123, "SetSprite updates the raw sprite ID")
+expect(firstHandle:SetObject(84), true, "buff handles can switch to object artwork")
+expect(first.sprite.spriteID, -1, "SetObject clears the raw sprite ID")
+expect(first.sprite.associatedObjectID, 84, "SetObject updates the associated object")
+expect(firstHandle:SetObject({ id = 85 }), true, "SetObject accepts an Obj config")
+expect(first.sprite.associatedObjectID, 85, "SetObject resolves an Obj config ID")
+expect(firstHandle:SetSprite("invalid"), false, "SetSprite rejects non-integer IDs")
+expect(first.sprite.associatedObjectID, 85, "an invalid sprite leaves the icon unchanged")
 
 local initialPositionUpdates = first.sprite.positionUpdates
 logicHandler({ logicTick = 1 })
@@ -343,6 +354,8 @@ expect(first.sprite.y, 39, "reclaiming space keeps the custom buff on the second
 expect(BuffBar.removeBuff(secondHandle), true, "removeBuff removes a buff")
 expect(BuffBar.removeBuff(firstHandle), true, "removeBuff removes the final buff")
 expect(firstHandle:SetLabel("removed"), false, "removed buff handles reject label changes")
+expect(firstHandle:SetObject(42), false, "removed buff handles reject object changes")
+expect(firstHandle:SetSprite(42), false, "removed buff handles reject sprite changes")
 expect(logicHandler, nil, "removing the final entry stops the logic subscription")
 
 local invalid = BuffBar.addDebuff({ spriteID = 10, duration = 0 })
