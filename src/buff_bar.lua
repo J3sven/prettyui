@@ -380,6 +380,36 @@ local function ensureStarted()
     end)
 end
 
+local function setTooltip(bar, entry, value)
+    if entry.tooltip ~= nil and value ~= nil and type(value) ~= "table" then
+        return entry.tooltip:SetText(value)
+    end
+    if entry.tooltip ~= nil then
+        if entry.tooltip.root ~= nil then
+            bar.ownDynamicIDs[entry.tooltip.root.dynamicID] = nil
+        end
+        entry.tooltip:Destroy()
+        entry.tooltip = nil
+    end
+    if value == nil then
+        if entry.tooltipTarget ~= nil then
+            bar.ownDynamicIDs[entry.tooltipTarget.dynamicID] = nil
+            entry.tooltipTarget:Destroy()
+            entry.tooltipTarget = nil
+        end
+        return true
+    end
+
+    if entry.tooltipTarget == nil then
+        entry.tooltipTarget = trackComponent(bar, ui.Layer.new(entry.layer))
+    end
+    entry.tooltip = Tooltip.attach(entry.tooltipTarget, entry.layer, value)
+    trackComponent(bar, entry.tooltip.root)
+    entry.tooltipTarget.hidden = not entry.visible
+    layout(bar, true)
+    return true
+end
+
 local Handle = {}
 Handle.__index = Handle
 
@@ -389,6 +419,12 @@ function Handle:SetLabel(text, rgba)
     entry.label.content = tostring(text or "")
     if rgba ~= nil then entry.label.rgba = rgba end
     return true
+end
+
+function Handle:SetTooltip(value)
+    local entry = self._bar.entriesByID[self._id]
+    if entry == nil then return false end
+    return setTooltip(self._bar, entry, value)
 end
 
 function Handle:SetVisible(visible)
@@ -478,6 +514,7 @@ local function add(bar, options)
         sprite = sprite,
         border = border,
         label = label,
+        layer = layer,
         tooltipTarget = tooltipTarget,
         tooltip = tooltip,
         visible = visible,
@@ -518,9 +555,11 @@ end
 --                                display whole minutes at 60 seconds or more,
 --                                then seconds, and remove themselves at zero.
 --
--- Returned handles support SetVisible(visible) and SetLabel(text, rgba).
--- Both return false after removal. Timed entries own their label, so SetLabel
--- returns false for them; hiding an entry does not pause its duration.
+-- Returned handles support SetVisible(visible), SetLabel(text, rgba), and
+-- SetTooltip(value). They return false after removal. Passing nil to SetTooltip
+-- removes the tooltip; a later non-nil value adds it again. Timed entries own
+-- their label, so SetLabel returns false for them; hiding an entry does not
+-- pause its duration.
 function BuffBar.addBuff(options)
     return add(bars.buff, options)
 end

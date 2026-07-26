@@ -168,7 +168,7 @@ function Slider.new(parent, options)
 
     self:SetValue(options.value == nil and self.min or options.value, false)
     self:SetDisabled(self.disabled)
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -310,12 +310,13 @@ function Slider:SetDisabled(disabled)
     self:_UpdateState()
 end
 
+function Slider:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
 function Slider:Destroy()
     self:_StopDrag()
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self.thumbDrag then
         self.thumbDrag:Destroy()
         self.thumbDrag = nil

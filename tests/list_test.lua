@@ -85,7 +85,11 @@ package.loaded["src/core/sprites"] = {
     SCROLL_THUMB_CENTRE = 7,
     SCROLL_THUMB_BOTTOM = 8,
 }
-package.loaded["src/tooltip"] = { attach = function() return nil end }
+package.loaded["src/tooltip"] = {
+    bind = function() return nil end,
+    set = function() return true end,
+    unbind = function() return true end,
+}
 
 local List = require("src/list")
 local parent = component(nil, "parent")

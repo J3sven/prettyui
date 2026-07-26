@@ -328,8 +328,8 @@ function Panel.new(parent, options, flowManaged)
     if self._canPopout then
         self.overlayDragLayer = createDragLayer(self.overlayParent, self.overlay, self)
     end
-    self.dockTooltip = Tooltip.attach(self.dock.root, parent, options.tooltip)
-    self.overlayTooltip = Tooltip.attach(self.overlay.root, overlayParent, options.tooltip)
+    Tooltip.bind(self, self.dock.root, parent, options.tooltip, "dockTooltip")
+    Tooltip.bind(self, self.overlay.root, overlayParent, options.tooltip, "overlayTooltip")
     self:SetPopoutClickthrough(self.popoutClickthrough)
     self:SetPoppedOut(self.poppedOut, false)
     self:_SetAltDragActive(isAltDown())
@@ -502,6 +502,12 @@ function Panel:SetSize(width, height)
             self.overlayDragLayer:SetSize(self.overlay.root.width, self.overlay.root.height)
         end
     end
+end
+
+function Panel:SetTooltip(value)
+    local dockUpdated = Tooltip.set(self, value, "dockTooltip")
+    local overlayUpdated = Tooltip.set(self, value, "overlayTooltip")
+    return dockUpdated and overlayUpdated
 end
 
 function Panel:SetScrollable(scrollable)
@@ -731,8 +737,8 @@ function Panel:Destroy()
     Layout.destroyManaged(self.overlayOwner)
     if self.dock and self.dock.content then Tooltip.unregisterContext(self.dock.content) end
     if self.overlay and self.overlay.content then Tooltip.unregisterContext(self.overlay.content) end
-    if self.dockTooltip then self.dockTooltip:Destroy() self.dockTooltip = nil end
-    if self.overlayTooltip then self.overlayTooltip:Destroy() self.overlayTooltip = nil end
+    Tooltip.unbind(self, "dockTooltip")
+    Tooltip.unbind(self, "overlayTooltip")
     if self.dock and self.dock.scroll then
         self.dock.scroll:Destroy()
         self.dock.scroll = nil

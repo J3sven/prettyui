@@ -64,7 +64,7 @@ function RibbonButton.new(parent, spriteID, action, options)
     end
 
     self:_UpdateState()
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -89,11 +89,12 @@ function RibbonButton:SetActive(active)
     self:_UpdateState()
 end
 
+function RibbonButton:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
 function RibbonButton:Destroy()
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self.root then
         self.root:Destroy()
         self.root = nil

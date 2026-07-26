@@ -204,6 +204,7 @@ local function captureEntry(layer, addEntry, hasTooltip)
         label = components[4],
         tooltipTarget = components[5],
         tooltipRoot = components[6],
+        tooltipLabel = components[6] and components[6].dynamicComponents[10],
     }
 end
 
@@ -291,6 +292,10 @@ expect(debuff.tooltipTarget.clickthrough, false, "tooltip target receives pointe
 expect(debuff.tooltipRoot.hidden, true, "tooltip starts hidden")
 expect(debuff.sprite.x, 32, "debuffs avoid native debuffs independently")
 expect(debuff.sprite.y, 101, "debuff layout follows the native row")
+expect(debuffHandle:SetTooltip("Updated debuff"), true, "buff handles update their tooltip")
+expect(debuff.tooltipLabel.content, "Updated debuff", "SetTooltip updates tooltip content")
+expect(secondHandle:SetTooltip("Added later"), true, "entries can add tooltips dynamically")
+expect(secondHandle:SetTooltip(nil), true, "entries can remove tooltips dynamically")
 
 debuff.tooltipTarget.subscriptions["1:prettyui_tooltip"]()
 expect(debuff.tooltipRoot.hidden, false, "hovering an entry shows its tooltip")
@@ -306,6 +311,7 @@ expect(debuff.tooltipTarget.destroyed, true, "removing a debuff destroys its too
 expect(debuff.tooltipRoot.destroyed, true, "removing a debuff destroys its tooltip")
 expect(debuffHandle:SetVisible(true), false, "removed handles reject visibility changes")
 expect(debuffHandle:SetLabel("removed"), false, "removed handles reject label changes")
+expect(debuffHandle:SetTooltip("removed"), false, "removed handles reject tooltip changes")
 
 local timedHandle, timed = captureEntry(buffLayer, function()
     return BuffBar.addBuff({ spriteID = 9, duration = 301 })

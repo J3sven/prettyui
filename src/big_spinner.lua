@@ -45,7 +45,7 @@ function BigSpinner.new(parent, options)
     self.rotating.rotationDegrees = self.rotation
     self.rotating.clickthrough = true
 
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     if options.autoPlay ~= false then self:Start() end
     return self
 end
@@ -57,6 +57,10 @@ end
 
 function BigSpinner:SetDegreesPerTick(degrees)
     self.degreesPerTick = tonumber(degrees) or DEFAULT_DEGREES_PER_TICK
+end
+
+function BigSpinner:SetTooltip(value)
+    return Tooltip.set(self, value)
 end
 
 function BigSpinner:Start()
@@ -79,10 +83,7 @@ end
 
 function BigSpinner:Destroy()
     self:Stop()
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self.root then
         self.root:Destroy()
         self.root = nil

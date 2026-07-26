@@ -124,6 +124,49 @@ function Tooltip.moveContextTooltipsToFront(collection)
     moveContextTooltipsToFront(contexts[collection])
 end
 
+function Tooltip.bind(owner, target, parent, value, field)
+    field = field or "tooltip"
+    owner._tooltipBindings = owner._tooltipBindings or {}
+    local binding = {
+        target = target,
+        parent = parent,
+        active = true,
+    }
+    owner._tooltipBindings[field] = binding
+    owner[field] = Tooltip.attach(target, parent, value)
+    return owner[field]
+end
+
+function Tooltip.set(owner, value, field)
+    field = field or "tooltip"
+    local bindings = owner and owner._tooltipBindings
+    local binding = bindings and bindings[field]
+    if binding == nil or not binding.active then return false end
+
+    local attachment = owner[field]
+    if attachment ~= nil and value ~= nil and type(value) ~= "table" then
+        return attachment:SetText(value)
+    end
+    if attachment ~= nil then attachment:Destroy() end
+    owner[field] = Tooltip.attach(binding.target, binding.parent, value)
+    return true
+end
+
+function Tooltip.unbind(owner, field)
+    field = field or "tooltip"
+    local bindings = owner and owner._tooltipBindings
+    local binding = bindings and bindings[field]
+    if binding == nil or not binding.active then return false end
+
+    binding.active = false
+    local attachment = owner[field]
+    if attachment ~= nil then attachment:Destroy() end
+    owner[field] = nil
+    bindings[field] = nil
+    if next(bindings) == nil then owner._tooltipBindings = nil end
+    return true
+end
+
 function Tooltip.attach(target, parent, value)
     if value == nil then return nil end
     local options = normalize(value)

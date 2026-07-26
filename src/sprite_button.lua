@@ -74,7 +74,7 @@ function SpriteButton.new(parent, spriteName, action, options)
     end)
 
     self:_UpdateState()
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -114,11 +114,12 @@ function SpriteButton:SetHoverCursor(cursor)
     Cursor.apply(self.root, self.hoverCursor, self.toggleable or not self.disabled)
 end
 
+function SpriteButton:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
 function SpriteButton:Destroy()
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self.root then
         self.root:Destroy()
         self.root = nil

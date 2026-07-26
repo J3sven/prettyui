@@ -160,7 +160,7 @@ function CollapseButton.new(parent, text, options)
 
     self:_Resize()
     self:_UpdateState()
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -337,6 +337,10 @@ function CollapseButton:SetHoverCursor(cursor)
     self:_UpdateCursor()
 end
 
+function CollapseButton:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
 function CollapseButton:_UpdateCursor()
     Cursor.apply(self.root, self.hoverCursor, not self.disabled)
 end
@@ -371,10 +375,7 @@ function CollapseButton:Destroy()
     end
     self.children = {}
     self.equalizedButtons = {}
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self.root then
         self.root:Destroy()
         self.root = nil

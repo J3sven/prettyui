@@ -160,7 +160,7 @@ function SimpleButton.new(parent, content, action, options)
     end)
 
     self:_UpdateState()
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -200,11 +200,12 @@ function SimpleButton:SetHoverCursor(cursor)
     Cursor.apply(self.root, self.hoverCursor, not self.disabled)
 end
 
+function SimpleButton:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
 function SimpleButton:Destroy()
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self.root then
         self.root:Destroy()
         self.root = nil

@@ -74,7 +74,7 @@ function TextField.new(parent, options)
         return false
     end)
 
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -105,8 +105,12 @@ function TextField:SetDisabled(disabled)
     end
 end
 
+function TextField:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
 function TextField:Destroy()
-    if self.tooltip then self.tooltip:Destroy() self.tooltip = nil end
+    Tooltip.unbind(self)
     if self.root then self.root:Destroy() self.root = nil end
 end
 

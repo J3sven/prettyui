@@ -41,15 +41,16 @@ function Divider.new(parent, options)
     self.root.clickthrough = true
     Wheel.bind(self.root, options)
 
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
+function Divider:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
 function Divider:Destroy()
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self.root then
         self.root:Destroy()
         self.root = nil

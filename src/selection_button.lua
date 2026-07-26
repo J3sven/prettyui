@@ -164,11 +164,11 @@ function SelectionButton.new(kind, parent, choices, options)
             return false
         end)
 
-        item.tooltipAttachment = Tooltip.attach(row, self.root, item.tooltip)
+        Tooltip.bind(item, row, self.root, item.tooltip, "tooltipAttachment")
         self:_UpdateItem(item)
     end
 
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -266,15 +266,27 @@ function SelectionButton:SetDisabled(disabled)
     self:_UpdateAll()
 end
 
+function SelectionButton:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
+function SelectionButton:SetOptionTooltip(value, tooltip)
+    for _, item in ipairs(self.items) do
+        if item.value == value then
+            item.tooltip = tooltip
+            return Tooltip.set(item, tooltip, "tooltipAttachment")
+        end
+    end
+    return false
+end
+
 function SelectionButton:Destroy()
+    for _, item in ipairs(self.items) do Tooltip.unbind(item, "tooltipAttachment") end
     if self.root then
         Tooltip.unregisterContext(self.root)
         self.optionTooltipContext = nil
     end
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self.root then
         self.root:Destroy()
         self.root = nil

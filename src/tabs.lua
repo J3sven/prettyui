@@ -271,7 +271,7 @@ function Tabs:_CreateTab(tab, x, options)
         return false
     end)
 
-    tab.tooltipAttachment = Tooltip.attach(tab.hit, self.root, tab.tooltip)
+    Tooltip.bind(tab, tab.hit, self.root, tab.tooltip, "tooltipAttachment")
     table.insert(self.tabs, tab)
     return width
 end
@@ -384,7 +384,7 @@ function Tabs.new(parent, values, options)
         end
     end
     self:SetActive(initial, false)
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -418,6 +418,17 @@ function Tabs:GetPage(index)
     return self.pages[index]
 end
 
+function Tabs:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
+function Tabs:SetTabTooltip(index, value)
+    local tab = self.tabs[index]
+    if tab == nil then return false end
+    tab.tooltip = value
+    return Tooltip.set(tab, value, "tooltipAttachment")
+end
+
 function Tabs:SetDisabled(index, disabled)
     local tab = self.tabs[index]
     if tab == nil then return false end
@@ -444,6 +455,7 @@ end
 
 function Tabs:Destroy()
     if self.root then Tooltip.unregisterContext(self.root) end
+    for _, tab in ipairs(self.tabs) do Tooltip.unbind(tab, "tooltipAttachment") end
     for _, page in ipairs(self.pages) do
         if page.content then Tooltip.unregisterContext(page.content) end
         Layout.destroyManaged(page)
@@ -451,7 +463,7 @@ function Tabs:Destroy()
     end
     self.pages = {}
     self.tabs = {}
-    if self.tooltip then self.tooltip:Destroy() self.tooltip = nil end
+    Tooltip.unbind(self)
     if self.root then self.root:Destroy() self.root = nil end
 end
 

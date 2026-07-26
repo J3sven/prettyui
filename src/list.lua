@@ -193,7 +193,7 @@ function List.new(parent, options)
     end)
 
     self:SetEntries(options.entries or options.choices or {})
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -492,8 +492,12 @@ function List:SetDisabled(disabled)
     self:_RebuildRows()
 end
 
+function List:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
 function List:Destroy()
-    if self.tooltip then self.tooltip:Destroy() self.tooltip = nil end
+    Tooltip.unbind(self)
     if self.root then self.root:Destroy() self.root = nil end
     self.rows = {}
     self.entries = {}

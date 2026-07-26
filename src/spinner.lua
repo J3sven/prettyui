@@ -38,7 +38,7 @@ function Spinner.new(parent, options)
     self.root.spriteID = FRAMES[1]
     self.root.clickthrough = true
     Wheel.bind(self.root, options)
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
 
     if options.autoPlay ~= false then self:Start() end
     return self
@@ -52,6 +52,10 @@ end
 function Spinner:SetTicksPerFrame(ticks)
     self.ticksPerFrame = clampTicks(ticks)
     self.tickAccumulator = 0
+end
+
+function Spinner:SetTooltip(value)
+    return Tooltip.set(self, value)
 end
 
 function Spinner:Start()
@@ -82,10 +86,7 @@ end
 
 function Spinner:Destroy()
     self:Stop()
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self.root then
         self.root:Destroy()
         self.root = nil

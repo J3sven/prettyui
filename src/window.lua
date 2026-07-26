@@ -254,7 +254,7 @@ function Window.new(parent, options)
     end, parentTooltipContext)
     self.tooltipContext.ownerWindow = self
     Layout.configure(self, options.layout or options.textLayout)
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
 
     return self
 end
@@ -271,6 +271,10 @@ end
 function Window:SetTitle(title)
     self.title = title
     if self.titleText then self.titleText.content = title or "" end
+end
+
+function Window:SetTooltip(value)
+    return Tooltip.set(self, value)
 end
 
 -- A window is a standard single-surface content host. Component definitions and
@@ -323,10 +327,7 @@ function Window:Destroy()
         Tooltip.unregisterContext(self.content)
         self.tooltipContext = nil
     end
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     if self._scroll then
         self._scroll:Destroy()
         self._scroll = nil

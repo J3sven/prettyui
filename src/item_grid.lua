@@ -334,6 +334,13 @@ function ItemGrid:SetObjectAt(column, row, object, tooltip, quantity)
     return self:SetObject((row - 1) * self.columns + column, object, tooltip, quantity)
 end
 
+function ItemGrid:SetTooltip(value)
+    if self.root == nil then return false end
+    self.tooltipOption = value
+    for index = 1, self.capacity do self:_ApplyEntry(index) end
+    return true
+end
+
 function ItemGrid:MoveObject(sourceIndex, destinationIndex, notify)
     local source = self.entries[sourceIndex]
     local destination = self.entries[destinationIndex]

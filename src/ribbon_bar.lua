@@ -243,7 +243,7 @@ local function createEntryButton(entry)
         entry.active = button.active
         if options.onClick then options.onClick(entry.handle, button.active) end
     end, {
-        tooltip = options.tooltip or options.label,
+        tooltip = entry.tooltipValue,
         disabled = options.disabled == true,
     })
     if options.object ~= nil then
@@ -333,6 +333,14 @@ function Handle:SetIcon(icon)
     return true
 end
 
+function Handle:SetTooltip(value)
+    local entry = entriesByID[self.id]
+    if entry == nil then return false end
+    entry.tooltipValue = value
+    if entry.button ~= nil then return entry.button:SetTooltip(value) end
+    return true
+end
+
 function Handle:Destroy()
     return RibbonBar.Unregister(self.id)
 end
@@ -345,6 +353,7 @@ function RibbonBar.Register(options)
     local existing = entriesByID[identifier]
     if existing ~= nil then
         existing.options = options
+        existing.tooltipValue = options.tooltip ~= nil and options.tooltip or options.label
         if root ~= nil then rebuildButtons() end
         return existing.handle
     end
@@ -353,6 +362,7 @@ function RibbonBar.Register(options)
         id = identifier,
         options = options,
         active = options.active == true,
+        tooltipValue = options.tooltip ~= nil and options.tooltip or options.label,
     }
     entry.handle = setmetatable({ id = identifier }, Handle)
     entriesByID[identifier] = entry

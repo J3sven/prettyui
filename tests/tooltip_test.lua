@@ -105,4 +105,28 @@ expect(tooltip.root.frontCount, frontCount + 1, "a visible tooltip remains in fr
 tooltip:Destroy()
 expect(tooltip:SetText("Ignored"), false, "destroyed tooltips reject updates")
 
+local owner = {}
+local boundTarget = component()
+boundTarget.width = 20
+boundTarget.height = 20
+boundTarget.clickthrough = true
+Tooltip.bind(owner, boundTarget, parent, nil)
+expect(owner.tooltip, nil, "bindings can start without a tooltip")
+expect(Tooltip.set(owner, "Added later"), true, "bindings add tooltips dynamically")
+local firstAttachment = owner.tooltip
+expect(firstAttachment.label.content, "Added later", "a dynamically added tooltip has the requested text")
+expect(Tooltip.set(owner, "Updated in place"), true, "plain text updates an existing attachment")
+expect(owner.tooltip, firstAttachment, "plain text preserves the attachment")
+expect(firstAttachment.label.content, "Updated in place", "plain text updates its label")
+expect(Tooltip.set(owner, { text = "Replacement", width = 140 }), true, "options replace an attachment")
+expect(owner.tooltip == firstAttachment, false, "options create a fresh attachment")
+expect(firstAttachment.root, nil, "the replaced attachment is destroyed")
+expect(owner.tooltip.width, 140, "replacement options take effect")
+expect(Tooltip.set(owner, nil), true, "nil removes a bound tooltip")
+expect(owner.tooltip, nil, "the removed attachment is cleared")
+expect(boundTarget.clickthrough, true, "removing restores the original target interaction")
+expect(Tooltip.set(owner, "Added again"), true, "a removed tooltip can be added again")
+expect(Tooltip.unbind(owner), true, "bindings can be destroyed")
+expect(Tooltip.set(owner, "Ignored"), false, "destroyed bindings reject updates")
+
 print("tooltip_test: ok")

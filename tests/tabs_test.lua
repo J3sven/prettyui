@@ -93,7 +93,9 @@ package.loaded["src/core/sprites"] = {
 package.loaded["src/tooltip"] = {
     getContext = function() return nil end,
     registerContext = function() return {} end,
-    attach = function() return nil end,
+    bind = function() return nil end,
+    set = function() return true end,
+    unbind = function() return true end,
     unregisterContext = function() end,
 }
 package.loaded["src/core/wheel"] = {

@@ -143,8 +143,10 @@ function ItemSlot:SetQuantity(quantity)
 end
 
 function ItemSlot:SetTooltip(value)
+    if self.root == nil then return false end
     self.tooltipValue = value
     self:_UpdateTooltip()
+    return true
 end
 
 function ItemSlot:Destroy()

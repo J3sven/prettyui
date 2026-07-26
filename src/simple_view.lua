@@ -45,11 +45,15 @@ function SimpleView.new(parent, options)
         parentContext
     )
     Layout.configure(self, options.layout or options.textLayout)
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
 ContentMethods.installSingle(SimpleView)
+
+function SimpleView:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
 
 function SimpleView:Destroy()
     Layout.destroyManaged(self)
@@ -57,10 +61,7 @@ function SimpleView:Destroy()
         Tooltip.unregisterContext(self.content)
         self.tooltipContext = nil
     end
-    if self.tooltip then
-        self.tooltip:Destroy()
-        self.tooltip = nil
-    end
+    Tooltip.unbind(self)
     Scroll.Destroy(self)
 end
 

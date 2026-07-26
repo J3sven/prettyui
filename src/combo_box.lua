@@ -73,7 +73,7 @@ function ComboBox.new(parent, options)
         return false
     end)
 
-    self.tooltip = Tooltip.attach(self.root, parent, options.tooltip)
+    Tooltip.bind(self, self.root, parent, options.tooltip)
     return self
 end
 
@@ -119,8 +119,12 @@ function ComboBox:SetDisabled(disabled)
     self.root.clickthrough = self.disabled
 end
 
+function ComboBox:SetTooltip(value)
+    return Tooltip.set(self, value)
+end
+
 function ComboBox:Destroy()
-    if self.tooltip then self.tooltip:Destroy() self.tooltip = nil end
+    Tooltip.unbind(self)
     if self.root then self.root:Destroy() self.root = nil end
 end
 
