@@ -117,6 +117,28 @@ local function createBorder(self)
     self.bottomRight.isFlippedHorizontally = true
 end
 
+local function resize(self, width, height)
+    self.width = width
+    self.height = height
+    self.contentWidth = width - self.paddingX * 2
+    self.contentHeight = height - self.paddingY * 2
+
+    self.root:SetSize(width, height)
+    self.background:SetSize(width - EDGE_SIZE * 2, height - EDGE_SIZE * 2)
+    self.top:SetSize(width - CORNER_SIZE * 2, EDGE_SIZE)
+    self.topRight:SetPos(width - CORNER_SIZE, 0)
+    self.left:SetSize(EDGE_SIZE, height - CORNER_SIZE * 2)
+    self.right:SetPos(width - EDGE_SIZE + 1, CORNER_SIZE)
+    self.right:SetSize(EDGE_SIZE, height - CORNER_SIZE * 2)
+    self.bottomLeft:SetPos(0, height - CORNER_SIZE)
+    local bottomWidth = width - CORNER_SIZE * 2
+    self.bottom[1]:SetPos(CORNER_SIZE, height - EDGE_SIZE)
+    self.bottom[1]:SetSize(bottomWidth, 1)
+    self.bottom[2]:SetPos(CORNER_SIZE, height - 1)
+    self.bottom[2]:SetSize(bottomWidth, 1)
+    self.bottomRight:SetPos(width - CORNER_SIZE, height - CORNER_SIZE)
+end
+
 function AnchoredTooltip.new(parent, options)
     if parent == nil then error("AnchoredTooltip requires a parent component collection") end
     options = options or {}
@@ -288,6 +310,24 @@ function AnchoredTooltip:Update()
     self.root:SetPos(x, y)
     self.root.hidden = false
     self.root:MoveToBack()
+    return true
+end
+
+function AnchoredTooltip:SetText(text)
+    if self.root == nil or self.label == nil then return false end
+
+    self.text = tostring(text or "")
+    self.options.text = self.text
+    self.label.content = self.text
+    local width, height = measure(
+        self.text,
+        self.options,
+        false,
+        self.paddingX,
+        self.paddingY
+    )
+    resize(self, width, height)
+    self:Update()
     return true
 end
 

@@ -246,6 +246,19 @@ function Tooltip:Show()
     self.root:MoveToFront()
 end
 
+function Tooltip:SetText(text)
+    if self.root == nil or self.label == nil then return false end
+
+    text = tostring(text or "")
+    self.options.text = text
+    self.width, self.height = measure(text, self.options)
+    self.root:SetSize(self.width, self.height)
+    self.label.content = text
+
+    if self.root.hidden ~= true then self:Show() end
+    return true
+end
+
 function Tooltip:Hide()
     if self.root then self.root.hidden = true end
 end
