@@ -27,10 +27,27 @@ local DEFAULT_WIDTH = 300
 local DEFAULT_HEIGHT = 160
 local DEFAULT_POPOUT_X = 80
 local DEFAULT_POPOUT_Y = 80
-local nextInstanceID = 0
+local DRAG_EVENT_ID = "prettyui_panel_drag"
+local dragPanels = {}
 
 local function isAltDown()
     return Keyboard.IsAvailable() and not Keyboard.IsBlocked() and Keyboard.IsAltDown()
+end
+
+local function pollAltDrag()
+    local active = isAltDown()
+    for panel in pairs(dragPanels) do panel:_SetAltDragActive(active) end
+end
+
+local function registerAltDrag(panel)
+    local wasEmpty = next(dragPanels) == nil
+    dragPanels[panel] = true
+    if wasEmpty then Event.Logic.Subscribe(DRAG_EVENT_ID, pollAltDrag) end
+end
+
+local function unregisterAltDrag(panel)
+    dragPanels[panel] = nil
+    if next(dragPanels) == nil then Event.Logic.Unsubscribe(DRAG_EVENT_ID) end
 end
 
 local function clampAlpha(value)
@@ -260,8 +277,6 @@ function Panel.new(parent, options, flowManaged)
     local overlayParent = options.overlayParent or (parentContext and parentContext.parent) or parent
 
     local self = setmetatable({}, Panel)
-    nextInstanceID = nextInstanceID + 1
-    self.dragEventID = "prettyui_panel_drag_" .. tostring(nextInstanceID)
     self.parent = parent
     self.overlayParent = overlayParent
     self._dockDraggable = flowManaged ~= true
@@ -333,9 +348,7 @@ function Panel.new(parent, options, flowManaged)
     self:SetPopoutClickthrough(self.popoutClickthrough)
     self:SetPoppedOut(self.poppedOut, false)
     self:_SetAltDragActive(isAltDown())
-    Event.Logic.Subscribe(self.dragEventID, function()
-        self:_SetAltDragActive(isAltDown())
-    end)
+    registerAltDrag(self)
     return self
 end
 
@@ -411,10 +424,11 @@ function Panel:_MoveDrag(component, x, y)
             component:MoveToFront()
             return false
         end
-        drag.surface.root:SetPos(
-            drag.panelX + mouse.x - drag.mouseX,
-            drag.panelY + mouse.y - drag.mouseY
-        )
+        local nextX = drag.panelX + mouse.x - drag.mouseX
+        local nextY = drag.panelY + mouse.y - drag.mouseY
+        if drag.surface.root.x ~= nextX or drag.surface.root.y ~= nextY then
+            drag.surface.root:SetPos(nextX, nextY)
+        end
     end
     return false
 end
@@ -731,7 +745,7 @@ function Panel:AddSlider(options)
 end
 
 function Panel:Destroy()
-    Event.Logic.Unsubscribe(self.dragEventID)
+    unregisterAltDrag(self)
     self:_StopDrag()
     Layout.destroyManaged(self.dockOwner)
     Layout.destroyManaged(self.overlayOwner)

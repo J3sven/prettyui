@@ -165,10 +165,11 @@ function Window.new(parent, options)
                     self.titleDrag:MoveToFront()
                     return false
                 end
-                self.root:SetPos(
-                    dragStart.windowX + mouse.x - dragStart.mouseX,
-                    dragStart.windowY + mouse.y - dragStart.mouseY
-                )
+                local nextX = dragStart.windowX + mouse.x - dragStart.mouseX
+                local nextY = dragStart.windowY + mouse.y - dragStart.mouseY
+                if self.root.x ~= nextX or self.root.y ~= nextY then
+                    self.root:SetPos(nextX, nextY)
+                end
             end
             return false
         end

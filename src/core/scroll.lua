@@ -312,10 +312,11 @@ function Scroll:_UpdateDrag(component, x, y)
         local thumbTravel = self.trackHeight - self.thumbHeight
         local maxScroll = self.scrollHeight - self.height
         if thumbTravel > 0 then
-            self:SetScrollPosition(
+            local nextPosition = clamp(math.floor(
                 self.dragStart.scrollY +
                 (mouse.y - self.dragStart.mouseY) * maxScroll / thumbTravel
-            )
+            ), 0, maxScroll)
+            if nextPosition ~= self.scrollY then self:SetScrollPosition(nextPosition) end
         end
     end
     return false

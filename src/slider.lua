@@ -59,6 +59,7 @@ function Slider.new(parent, options)
     self.parent = parent
     self.min, self.max, self.step = configureRange(options)
     self.value = self.min
+    self._valueLaidOut = false
     self.onChange = options.onChange
     self.disabled = options.disabled == true
     self.buttonGap = math.max(0, tonumber(options.buttonGap) or DEFAULT_BUTTON_GAP)
@@ -289,7 +290,9 @@ function Slider:SetValue(value, notify)
     value = self.min + math.floor((value - self.min) / self.step + 0.5) * self.step
     value = clamp(value, self.min, self.max)
     local changed = value ~= self.value
+    if not changed and self._valueLaidOut then return false end
     self.value = value
+    self._valueLaidOut = true
     self:_LayoutValue()
     self:_UpdateState()
     if changed and notify ~= false and self.onChange then self.onChange(self, self.value) end

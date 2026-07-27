@@ -330,6 +330,11 @@ function Tabs.new(parent, values, options)
     options = options or {}
     local normalized = normalizeTabs(values)
     local width, height = Tabs.getSize(normalized, options)
+    local heightAnchor = options.heightAnchor or 0
+    local rootHeight = height
+    if heightAnchor == 0 then
+        rootHeight = math.max(TAB_BASELINE + 1, height)
+    end
 
     local self = setmetatable({}, Tabs)
     self.parent = parent
@@ -343,7 +348,7 @@ function Tabs.new(parent, values, options)
 
     self.root = ui.Layer.new(parent)
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
-    self.root:SetSize(width, math.max(TAB_BASELINE + 1, height), options.widthAnchor or 0, options.heightAnchor or 0)
+    self.root:SetSize(width, rootHeight, options.widthAnchor or 0, heightAnchor)
     self.root.clickthrough = true
     Wheel.bind(self.root, options)
 

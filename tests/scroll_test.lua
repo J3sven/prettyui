@@ -13,6 +13,11 @@ local function component(parent, kind)
         height = 0,
         hidden = false,
         subscriptions = {},
+        opConfig = {
+            ClearOpCursors = function() end,
+            SetOpCursor = function() end,
+        },
+        cursorConfig = {},
     }
     function result:SetPos(x, y, xAnchor, yAnchor)
         self.x = x + ((parent and parent.width or 0) * (xAnchor or 0))
@@ -26,6 +31,7 @@ local function component(parent, kind)
         self.scrollWidth, self.scrollHeight = width, height
     end
     function result:SetScrollPos(x, y)
+        self.scrollPositionUpdates = (self.scrollPositionUpdates or 0) + 1
         self.scrollX, self.scrollY = x, y
     end
     function result:Subscribe(hook, callback)
@@ -74,6 +80,7 @@ local font = {
     GetStringWidth = function(_, text) return #text * 7 end,
 }
 config = {
+    Cursor = { CURSOR_GOTO = 1 },
     Font = {
         MUSEO_SANS_15PT_REGULAR = font,
         CINZEL_13PT_BOLD = font,
@@ -89,6 +96,12 @@ package.loaded["src/core/sprites"] = {
     SCROLL_THUMB_TOP = 6,
     SCROLL_THUMB_CENTRE = 7,
     SCROLL_THUMB_BOTTOM = 8,
+    DIVIDER = 9,
+    TEXT_TAB = {
+        inactive = { left = 10, middle = 11, right = 12 },
+        active = { left = 13, middle = 14, right = 15 },
+        disabled = { left = 16, middle = 17, right = 18 },
+    },
 }
 
 local Scroll = require("src/core/scroll")
@@ -180,6 +193,13 @@ expect(
     parent.width,
     "window overlay synchronization preserves the expanded thumb capture"
 )
+local scrollPositionUpdates = window._scroll.viewport.scrollPositionUpdates
+thumbDrag.subscriptions[ui.Hook.ONHOLD](thumbDrag, 1, 40)
+expect(
+    window._scroll.viewport.scrollPositionUpdates,
+    scrollPositionUpdates,
+    "a stationary scrollbar drag skips duplicate native scroll writes"
+)
 thumbDrag.subscriptions[ui.Hook.ONRELEASE]()
 expect(thumbDrag.width, 16, "thumb capture returns to the visual thumb after release")
 
@@ -194,5 +214,42 @@ end
 expect(fixedWindow.scrollbarVisible, false, "scrollable=false keeps a wrapper unscrolled")
 window:Destroy()
 fixedWindow:Destroy()
+
+local trackerWindow = Window.new(parent, {
+    title = "Achievement Tracker",
+    width = 600,
+    height = 600,
+})
+local trackerTabs = trackerWindow:AddTabs(
+    { "General", "Debug" },
+    { height = -20, heightAnchor = 1.0 }
+)
+local generalPage = trackerTabs:GetPage(1)
+expect(
+    trackerTabs.root.height,
+    trackerWindow.content.height - 20,
+    "anchored tab height preserves its negative parent offset"
+)
+
+for index = 1, 13 do
+    generalPage:AddText({
+        text = index == 13 and "Add server" or "Server row " .. index,
+        height = 30,
+        marginBottom = 8,
+    })
+end
+expect(
+    generalPage.scrollbarVisible,
+    true,
+    "tab page scrolling starts when tracker rows exceed the visible page"
+)
+generalPage:SetScrollPosition(10000)
+local addRow = generalPage._managedFlowEntries[#generalPage._managedFlowEntries].component
+expect(
+    addRow.y + addRow.height - generalPage.scrollY <= generalPage._scroll.height,
+    true,
+    "the final add row is reachable at the bottom of the scroll range"
+)
+trackerWindow:Destroy()
 
 print("scroll_test: ok")
