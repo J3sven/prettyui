@@ -30,6 +30,7 @@ local PrettyUI = {
     Tabs = require("src/tabs"),
     Text = require("src/text"),
     TextField = TextField,
+    Draw = require("src/draw"),
     Tooltip = require("src/tooltip"),
     Window = require("src/window"),
     Scrollbar = require("src/scrollbar"),
@@ -37,7 +38,7 @@ local PrettyUI = {
     BuffBar = BuffBar,
 }
 
-PrettyUI.version = "0.1.0"
+PrettyUI.version = "0.5.0"
 
 RibbonBar.Start()
 
