@@ -30,7 +30,6 @@ local PrettyUI = {
     Tabs = require("src/tabs"),
     Text = require("src/text"),
     TextField = TextField,
-    Draw = require("src/draw"),
     Tooltip = require("src/tooltip"),
     Window = require("src/window"),
     Scrollbar = require("src/scrollbar"),

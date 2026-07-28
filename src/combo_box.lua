@@ -90,6 +90,42 @@ function ComboBox:Clear()
 end
 
 function ComboBox:SetEntries(entries, selectedID)
+    local entriesMap = {}
+    local labels = {}
+    local selectedLabel
+    local hasUniqueLabels = true
+
+    for index, entry in ipairs(entries or {}) do
+        local label, entryID = entryParts(entry, index)
+        if entriesMap[label] ~= nil then
+            hasUniqueLabels = false
+        else
+            entriesMap[label] = entryID
+            labels[#labels + 1] = label
+        end
+        if entryID == selectedID then selectedLabel = label end
+    end
+
+    if selectedID ~= nil and selectedLabel ~= nil and hasUniqueLabels then
+        local setEntriesResult = self.root:SetEntries(entriesMap, selectedID)
+        if self.root.hasSelection and self.root.selectedID == selectedID then
+            return setEntriesResult
+        end
+
+        -- Some client builds interpret selectedID as the one-based position
+        -- of the label after sorting instead of as the map's explicit ID.
+        table.sort(labels)
+        for position, label in ipairs(labels) do
+            if label == selectedLabel then
+                local fallbackResult = self.root:SetEntries(entriesMap, position)
+                if self.root.hasSelection and self.root.selectedID == selectedID then
+                    return fallbackResult
+                end
+                break
+            end
+        end
+    end
+
     self.root:Clear()
     for index, entry in ipairs(entries or {}) do
         local label, entryID = entryParts(entry, index)
