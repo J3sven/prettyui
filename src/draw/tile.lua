@@ -1,3 +1,6 @@
+-- Draw a tile where each corner is matched to the terrain height.
+local Tile = {}
+
 local TILE_SIZE = 512.0
 local OUTLINE_HEIGHT_BIAS = 1.0
 local DEFAULT_HEIGHT_OFFSET = 30.0
@@ -153,7 +156,7 @@ end
 --
 -- Colours may be RGB (0xRRGGBB) or RGBA (0xRRGGBBAA). Explicit opacity
 -- values are in the 0.0-1.0 range and override an embedded alpha channel.
-local function Tile(settings)
+function Tile.Draw(settings)
     settings = settings or {}
 
     local outlineEnabled = settings.outline ~= false

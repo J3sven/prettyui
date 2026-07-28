@@ -40,6 +40,7 @@ package.loaded["src/draw"] = nil
 package.loaded["src/draw/tile"] = nil
 local Draw = require("src/draw")
 
+expect(type(package.loaded["src/draw/tile"]), "table", "tile module returns a library table")
 expect(type(Draw.Tile), "function", "Draw.Tile is exported by the drawing entrypoint")
 
 local drawn = Draw.Tile{
