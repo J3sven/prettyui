@@ -177,10 +177,17 @@ local Window = require("src/window")
 local window = Window.new(parent, { width = 300, height = 150 })
 expect(window.scrollable, true, "window content defaults to scrollable")
 expect(window.scrollbarVisible, false, "window bar starts hidden")
+local rows = {}
 for index = 1, 5 do
-    window:AddText({ text = "Row " .. index, height = 30 })
+    rows[index] = window:AddText({ text = "Row " .. index, height = 30 })
 end
 expect(window.scrollbarVisible, true, "flow layout overflow reveals the window bar")
+local removedY = rows[2].y
+rows[2]:Destroy()
+expect(rows[3].y, removedY, "destroying text reclaims its flow row")
+expect(#window._managedFlowEntries, 4, "destroyed text leaves the flow registry")
+local replacement = window:AddText({ text = "Replacement", height = 30 })
+expect(replacement.y, rows[5].y + rows[5].height + 2, "new text follows the reflowed rows")
 window:SetScrollPosition(10)
 expect(window.scrollY, 10, "installed host methods keep public scroll state synchronized")
 

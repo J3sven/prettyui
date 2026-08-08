@@ -98,7 +98,7 @@ function Text.append(owner, value, isTitle)
         gap = isTitle and TITLE_GAP or BODY_GAP,
         marginTop = isTitle and TITLE_MARGIN_TOP or 0,
     })
-    return Layout.track(owner, create(owner.content, options, isTitle), options)
+    return Layout.manage(owner, create(owner.content, options, isTitle), options)
 end
 
 function Text.new(parent, options)
