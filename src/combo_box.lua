@@ -59,9 +59,15 @@ end
 
 function ComboBox.new(parent, options)
     options = options or {}
+    local _, hasOrder = orderedEntries(options.entries or options.choices or {})
+    if hasOrder then
+        return require("src/ordered_combo_box").new(parent, options)
+    end
+
     local self = setmetatable({}, ComboBox)
     self.onChange = options.onChange
     self.disabled = options.disabled == true
+    self._labelsByID = {}
 
     self.root = ui.ComboField.new(parent)
     self.root.stylesheetID = options.stylesheetID or id.StyleSheet.COMBO_DEFAULT
@@ -104,7 +110,7 @@ function ComboBox.new(parent, options)
     self:SetEntries(options.entries or options.choices or {}, options.selectedID or options.selected)
     self.root:Subscribe(ui.Hook.ONSELECTIONCHANGED, function(_, entryID, eventType)
         if not self._suppressCallbacks and self.onChange then
-            self.onChange(self, entryID, self.root.selectedLabel, eventType)
+            self.onChange(self, entryID, self:GetSelectedLabel(), eventType)
         end
         return false
     end)
@@ -114,29 +120,33 @@ function ComboBox.new(parent, options)
 end
 
 function ComboBox:Add(label, entryID)
-    return self.root:Add(tostring(label), entryID)
+    label = tostring(label)
+    local result = self.root:Add(label, entryID)
+    if result then self._labelsByID[entryID] = label end
+    return result
 end
 
 function ComboBox:Remove(entryID)
-    return self.root:Remove(entryID)
+    local result = self.root:Remove(entryID)
+    if result then self._labelsByID[entryID] = nil end
+    return result
 end
 
 function ComboBox:Clear()
     self.root:Clear()
+    self._labelsByID = {}
 end
 
 function ComboBox:SetEntries(entries, selectedID)
-    local sortedEntries, hasOrder = orderedEntries(entries)
+    local _, hasOrder = orderedEntries(entries)
+    self._labelsByID = {}
+    for index, entry in ipairs(entries or {}) do
+        local label, entryID = entryParts(entry, index)
+        self._labelsByID[entryID] = label
+    end
 
-    -- Explicit ordering requires Add so the native map-based SetEntries path
-    -- cannot alphabetise the labels again.
     if hasOrder then
-        self.root:Clear()
-        for _, entry in ipairs(sortedEntries) do
-            self.root:Add(entry.label, entry.entryID)
-        end
-        if selectedID ~= nil then self:Select(selectedID, false) end
-        return
+        error("ordered entries require a ComboBox constructed with ordered entries")
     end
 
     local entriesMap = {}
@@ -195,7 +205,8 @@ function ComboBox:GetSelectedID()
 end
 
 function ComboBox:GetSelectedLabel()
-    return self.root.hasSelection and self.root.selectedLabel or nil
+    if not self.root.hasSelection then return nil end
+    return self._labelsByID[self.root.selectedID] or self.root.selectedLabel
 end
 
 function ComboBox:SetDisabled(disabled)

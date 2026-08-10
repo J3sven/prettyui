@@ -76,6 +76,7 @@ function List.new(parent, options)
     self.selectedColour = options.selectedColour or options.selectedColor or SELECTED_COLOUR
     self.shadowed = options.shadowed ~= false
     self._onScrollWheel = options._onScrollWheel
+    self._onEntryClick = options._onEntryClick
     self.entries = {}
     self.entriesByID = {}
     self.rows = {}
@@ -215,6 +216,30 @@ end
 
 function List:_ViewportHeight()
     return math.max(1, self:_ResolvedHeight() - 2)
+end
+
+function List:SetSize(width, height, widthAnchor, heightAnchor)
+    self.widthValue = width or self.widthValue
+    self.heightValue = height or self.heightValue
+    self.widthAnchor = widthAnchor or 0
+    self.heightAnchor = heightAnchor or 0
+    self.root:SetSize(
+        self.widthValue,
+        self.heightValue,
+        self.widthAnchor,
+        self.heightAnchor
+    )
+
+    local resolvedHeight = self:_ResolvedHeight()
+    self.frame[2]:SetPos(0, resolvedHeight - 1)
+    self.frame[3]:SetSize(1, resolvedHeight)
+    self.frame[4]:SetSize(1, resolvedHeight)
+
+    local trackHeight = math.max(1, resolvedHeight - ARROW_SIZE * 2 - 2)
+    self.track:SetSize(BAR_WIDTH, trackHeight)
+    self.trackCentre:SetSize(BAR_WIDTH, math.max(1, trackHeight - END_SIZE * 2))
+    self.trackBottom:SetPos(0, math.max(0, trackHeight - END_SIZE))
+    self:SetScrollPosition(self.scrollY)
 end
 
 function List:_OnScrollWheel(component, delta)
@@ -365,7 +390,10 @@ function List:_RebuildRows()
                 end)
                 row:Subscribe(ui.Hook.ONCLICK, function()
                     local selected = self.maxSelected > 1 and not entry.selected or true
-                    self:_Select(entry, selected, true)
+                    local succeeded = self:_Select(entry, selected, true)
+                    if succeeded and self._onEntryClick then
+                        self._onEntryClick(self, entry.id, entry.selected)
+                    end
                     return false
                 end)
                 Cursor.apply(row, config.Cursor.CURSOR_TICK, true)

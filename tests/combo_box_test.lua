@@ -8,6 +8,7 @@ end
 local function comboField()
     local result = {
         entries = {},
+        entryLabels = {},
         entryText = {},
         hasSelection = false,
         selectedID = -1,
@@ -18,7 +19,7 @@ local function comboField()
     function result:Subscribe() end
     function result:Clear()
         self.entries = {}
-        self.entryOrder = {}
+        self.entryLabels = {}
         self.hasSelection = false
         self.selectedID = -1
         self.selectedLabel = ""
@@ -28,17 +29,18 @@ local function comboField()
         self.bulkSetEntriesCalls = (self.bulkSetEntriesCalls or 0) + 1
         local labels = {}
         for label, entryID in pairs(entriesMap) do
-            self.entries[entryID] = label
+            self.entries[#self.entries + 1] = { id = entryID, text = label }
+            self.entryLabels[entryID] = label
             labels[#labels + 1] = label
         end
         table.sort(labels)
-        for _, label in ipairs(labels) do self.entryOrder[#self.entryOrder + 1] = label end
+        table.sort(self.entries, function(left, right) return left.text < right.text end)
         local selectedLabel = labels[selectedID]
         if selectedLabel == nil then return false end
         -- Mirrors the target client: selectedID is treated as the sorted
         -- label's one-based position rather than the map's explicit ID.
         local selectedEntryID
-        for entryID, label in pairs(self.entries) do
+        for entryID, label in pairs(self.entryLabels) do
             if label == selectedLabel then
                 selectedEntryID = entryID
                 break
@@ -46,12 +48,13 @@ local function comboField()
         end
         self.hasSelection = true
         self.selectedID = selectedEntryID
-        self.selectedLabel = self.entries[selectedEntryID]
+        self.selectedLabel = self.entryLabels[selectedEntryID]
         return true
     end
     function result:Add(label, entryID)
-        self.entries[entryID] = label
-        self.entryOrder[#self.entryOrder + 1] = label
+        self.entries[#self.entries + 1] = { id = entryID, text = label }
+        self.entryLabels[entryID] = label
+        table.sort(self.entries, function(left, right) return left.text < right.text end)
         -- Mirrors the native combo's implicit first-entry selection.
         if not self.hasSelection then
             self.hasSelection = true
@@ -69,10 +72,14 @@ local function comboField()
         self.selectedLabel = ""
     end
     function result:Select(entryID, triggerEvents)
-        if self.entries[entryID] == nil then return false end
+        local selectedEntry
+        for _, entry in ipairs(self.entries) do
+            if entry.id == entryID then selectedEntry = entry break end
+        end
+        if selectedEntry == nil then return false end
         self.hasSelection = true
         self.selectedID = entryID
-        self.selectedLabel = self.entries[entryID]
+        self.selectedLabel = selectedEntry.text
         self.lastSelectTriggerEvents = triggerEvents
         return true
     end
@@ -103,9 +110,15 @@ package.loaded["src/tooltip"] = {
     set = function() return true end,
     unbind = function() end,
 }
+package.loaded["src/ordered_combo_box"] = {
+    new = function(_, options)
+        return { ordered = true, options = options }
+    end,
+}
 package.loaded["src/combo_box"] = nil
 
 local ComboBox = require("src/combo_box")
+
 local combo = ComboBox.new({}, {
     entries = {
         { label = "Small", id = 1 },
@@ -144,21 +157,8 @@ local orderedCombo = ComboBox.new({}, {
     },
     selectedID = 20,
 })
-expect(table.concat(orderedCombo.root.entryOrder, ","), "First,Alpha,Beta,Zulu",
-    "ordered entries use ascending order then alphabetical labels")
-expect(orderedCombo:GetSelectedID(), 20, "ordered entries preserve selected ID")
-expect(orderedCombo:GetSelectedLabel(), "Beta", "ordered entries preserve selected label")
-expect(orderedCombo.root.bulkSetEntriesCalls, nil, "ordered entries avoid alphabetising bulk path")
-
-local generatedIDCombo = ComboBox.new({}, {
-    entries = {
-        { label = "Second", order = 2 },
-        { label = "First", order = 1 },
-    },
-    selectedID = 1,
-})
-expect(generatedIDCombo:GetSelectedID(), 1, "ordering preserves generated ID")
-expect(generatedIDCombo:GetSelectedLabel(), "Second", "generated ID remains tied to original entry")
+expect(orderedCombo.ordered, true, "ordered entries use the custom combobox")
+expect(orderedCombo.options.selectedID, 20, "custom combobox receives constructor options")
 
 local validOrder, orderError = pcall(function()
     ComboBox.new({}, { entries = { { label = "Invalid", order = 1.5 } } })
