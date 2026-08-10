@@ -16,6 +16,42 @@ local function entryParts(entry, fallbackID)
     return tostring(entry), fallbackID
 end
 
+local function orderedEntries(entries)
+    local result = {}
+    local hasOrder = false
+
+    for index, entry in ipairs(entries or {}) do
+        local label, entryID = entryParts(entry, index)
+        local order = type(entry) == "table" and entry.order or nil
+        if order ~= nil then
+            if type(order) ~= "number" or order ~= math.floor(order) then
+                error("ComboBox entry order must be an integer")
+            end
+            hasOrder = true
+        end
+        result[index] = {
+            entryID = entryID,
+            index = index,
+            label = label,
+            order = order,
+        }
+    end
+
+    if not hasOrder then return entries or {}, false end
+
+    table.sort(result, function(left, right)
+        if left.order ~= right.order then
+            if left.order == nil then return false end
+            if right.order == nil then return true end
+            return left.order < right.order
+        end
+        if left.label ~= right.label then return left.label < right.label end
+        return left.index < right.index
+    end)
+
+    return result, true
+end
+
 function ComboBox.getSize(options)
     options = options or {}
     return options.width or DEFAULT_WIDTH, options.height or DEFAULT_HEIGHT
@@ -90,6 +126,19 @@ function ComboBox:Clear()
 end
 
 function ComboBox:SetEntries(entries, selectedID)
+    local sortedEntries, hasOrder = orderedEntries(entries)
+
+    -- Explicit ordering requires Add so the native map-based SetEntries path
+    -- cannot alphabetise the labels again.
+    if hasOrder then
+        self.root:Clear()
+        for _, entry in ipairs(sortedEntries) do
+            self.root:Add(entry.label, entry.entryID)
+        end
+        if selectedID ~= nil then self:Select(selectedID, false) end
+        return
+    end
+
     local entriesMap = {}
     local labels = {}
     local selectedLabel

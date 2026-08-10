@@ -18,6 +18,7 @@ local function comboField()
     function result:Subscribe() end
     function result:Clear()
         self.entries = {}
+        self.entryOrder = {}
         self.hasSelection = false
         self.selectedID = -1
         self.selectedLabel = ""
@@ -31,6 +32,7 @@ local function comboField()
             labels[#labels + 1] = label
         end
         table.sort(labels)
+        for _, label in ipairs(labels) do self.entryOrder[#self.entryOrder + 1] = label end
         local selectedLabel = labels[selectedID]
         if selectedLabel == nil then return false end
         -- Mirrors the target client: selectedID is treated as the sorted
@@ -49,6 +51,7 @@ local function comboField()
     end
     function result:Add(label, entryID)
         self.entries[entryID] = label
+        self.entryOrder[#self.entryOrder + 1] = label
         -- Mirrors the native combo's implicit first-entry selection.
         if not self.hasSelection then
             self.hasSelection = true
@@ -131,5 +134,37 @@ local smallCombo = ComboBox.new({}, {
 expect(smallCombo:GetSelectedID(), 1, "sorted-position fallback restores small ID")
 expect(smallCombo:GetSelectedLabel(), "Small", "sorted-position fallback restores small header")
 expect(smallCombo.root.bulkSetEntriesCalls, 2, "small selection uses sorted-position fallback")
+
+local orderedCombo = ComboBox.new({}, {
+    entries = {
+        { label = "Zulu", id = 10 },
+        { label = "Beta", id = 20, order = 2 },
+        { label = "Alpha", id = 30, order = 2 },
+        { label = "First", id = 40, order = 1 },
+    },
+    selectedID = 20,
+})
+expect(table.concat(orderedCombo.root.entryOrder, ","), "First,Alpha,Beta,Zulu",
+    "ordered entries use ascending order then alphabetical labels")
+expect(orderedCombo:GetSelectedID(), 20, "ordered entries preserve selected ID")
+expect(orderedCombo:GetSelectedLabel(), "Beta", "ordered entries preserve selected label")
+expect(orderedCombo.root.bulkSetEntriesCalls, nil, "ordered entries avoid alphabetising bulk path")
+
+local generatedIDCombo = ComboBox.new({}, {
+    entries = {
+        { label = "Second", order = 2 },
+        { label = "First", order = 1 },
+    },
+    selectedID = 1,
+})
+expect(generatedIDCombo:GetSelectedID(), 1, "ordering preserves generated ID")
+expect(generatedIDCombo:GetSelectedLabel(), "Second", "generated ID remains tied to original entry")
+
+local validOrder, orderError = pcall(function()
+    ComboBox.new({}, { entries = { { label = "Invalid", order = 1.5 } } })
+end)
+expect(validOrder, false, "fractional entry order is rejected")
+expect(orderError:find("must be an integer", 1, true) ~= nil, true,
+    "invalid entry order explains the requirement")
 
 print("combo_box_test: ok")
