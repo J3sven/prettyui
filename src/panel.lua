@@ -532,6 +532,12 @@ function Panel:SetScrollable(scrollable)
     self.scrollable = self.dock.scroll.scrollable
 end
 
+function Panel:ScrollToChild(child, topOffset)
+    if child == nil then return end
+    self.dock.scroll:ScrollToChild(child.dock, topOffset)
+    self.overlay.scroll:ScrollToChild(child.overlay, topOffset)
+end
+
 -- Install the shared Add... API against both panel surfaces. The stateful methods
 -- below overwrite their generated counterparts to keep dock and popout state in sync.
 ContentMethods.installPaired(Panel, function(panel)

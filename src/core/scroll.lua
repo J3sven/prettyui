@@ -9,6 +9,7 @@ local BAR_GAP = 2
 local ARROW_SIZE = 16
 local END_SIZE = 5
 local MIN_THUMB_HEIGHT = 24
+local DEFAULT_CHILD_TOP_OFFSET = 12
 
 local function clamp(value, minimum, maximum)
     return math.max(minimum, math.min(maximum, value))
@@ -222,6 +223,9 @@ function Scroll.install(class)
     class.ScrollBy = function(self, delta)
         return self._scroll:ScrollBy(delta)
     end
+    class.ScrollToChild = function(self, child, topOffset)
+        return self._scroll:ScrollToChild(child, topOffset)
+    end
     class.SetScrollable = function(self, scrollable)
         return self._scroll:SetScrollable(scrollable)
     end
@@ -331,6 +335,13 @@ end
 
 function Scroll:ScrollBy(delta)
     self:SetScrollPosition(self.scrollY + delta)
+end
+
+function Scroll:ScrollToChild(child, topOffset)
+    local root = child and (child.root or child) or nil
+    if root == nil or root.y == nil then return end
+    if topOffset == nil then topOffset = DEFAULT_CHILD_TOP_OFFSET end
+    self:SetScrollPosition(root.y - topOffset)
 end
 
 function Scroll:SetContentHeight(contentHeight)

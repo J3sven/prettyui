@@ -128,6 +128,19 @@ expect(scroll.scrollbarVisible, true, "bar appears when content overflows")
 expect(scroll.contentWidth, 282, "visible bar reserves its width and gap")
 expect(scroll.track.hidden, false, "track is visible during overflow")
 
+local anchor = component(scroll.content, "anchor")
+anchor:SetPos(0, 90)
+scroll:ScrollToChild(anchor)
+expect(scroll.scrollY, 78, "scroll-to-child leaves the default inset above a native child")
+scroll:ScrollToChild({ root = anchor }, 24)
+expect(scroll.scrollY, 66, "scroll-to-child accepts control wrappers and a custom inset")
+anchor:SetPos(0, 175)
+scroll:ScrollToChild(anchor)
+expect(scroll.scrollY, 80, "scroll-to-child clamps anchors near the end of the content")
+anchor:SetPos(0, 5)
+scroll:ScrollToChild(anchor)
+expect(scroll.scrollY, 0, "scroll-to-child clamps anchors near the start of the content")
+
 local handled = scroll.content.subscriptions[ui.Hook.ONSCROLLWHEEL](scroll.content, 1)
 expect(handled, false, "wheel input is consumed while scrolling")
 expect(scroll.scrollY, 32, "wheel input advances by the configured step")
@@ -190,6 +203,12 @@ local replacement = window:AddText({ text = "Replacement", height = 30 })
 expect(replacement.y, rows[5].y + rows[5].height + 2, "new text follows the reflowed rows")
 window:SetScrollPosition(10)
 expect(window.scrollY, 10, "installed host methods keep public scroll state synchronized")
+window:ScrollToChild(rows[4], 4)
+expect(
+    window.scrollY,
+    math.min(rows[4].y - 4, window._scroll.scrollHeight - window._scroll.height),
+    "installed hosts expose scroll-to-child"
+)
 
 local thumbDrag = window._scroll.thumbDrag
 thumbDrag.subscriptions[ui.Hook.ONCLICK](thumbDrag, 1, 1)
@@ -221,6 +240,23 @@ end
 expect(fixedWindow.scrollbarVisible, false, "scrollable=false keeps a wrapper unscrolled")
 window:Destroy()
 fixedWindow:Destroy()
+
+local Panel = require("src/panel")
+local panelTargets = {}
+local fakePanel = {
+    dock = { scroll = { ScrollToChild = function(_, child, offset)
+        panelTargets.dock, panelTargets.dockOffset = child, offset
+    end } },
+    overlay = { scroll = { ScrollToChild = function(_, child, offset)
+        panelTargets.overlay, panelTargets.overlayOffset = child, offset
+    end } },
+}
+local pairedChild = { dock = {}, overlay = {} }
+Panel.ScrollToChild(fakePanel, pairedChild, 9)
+expect(panelTargets.dock, pairedChild.dock, "panels scroll their dock child")
+expect(panelTargets.overlay, pairedChild.overlay, "panels scroll their popout child")
+expect(panelTargets.dockOffset, 9, "panels forward the dock inset")
+expect(panelTargets.overlayOffset, 9, "panels forward the popout inset")
 
 local trackerWindow = Window.new(parent, {
     title = "Achievement Tracker",
