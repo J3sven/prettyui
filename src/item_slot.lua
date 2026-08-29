@@ -7,6 +7,9 @@ ItemSlot.__index = ItemSlot
 
 local SLOT_SIZE = 40
 local DEFAULT_ITEM_INSET = 4
+local DISABLED_OVERLAY_RGBA = 0x000000FF
+local DISABLED_OVERLAY_ALPHA = 0.55
+local DISABLED_ITEM_ALPHA = 0.75
 
 local function objectID(object)
     if object == nil then return nil end
@@ -32,12 +35,25 @@ function ItemSlot:_UpdateQuantity()
         self.item.associatedObjectQuantityMode = ui.ObjectQuantityDisplayMode.NEVER
     end
 end
+function ItemSlot:_UpdateDisabled()
+    if self.disabledOverlay == nil then return end
+    local visible = self.disabled and self.item ~= nil
+    if self.item ~= nil then
+        self.item.alpha = self.disabled and DISABLED_ITEM_ALPHA or 1
+    end
+    self.disabledOverlay.hidden = not visible
+    if visible then self.disabledOverlay:MoveToFront() end
+end
+
 
 function ItemSlot:_CreateItemSprite()
     if self.item then self.item:Destroy() end
     self.item = nil
     local id = objectID(self.object)
-    if id == nil then return end
+    if id == nil then
+        self:_UpdateDisabled()
+        return
+    end
 
     self.item = ui.Sprite.new(self.root)
     self.item:SetPos(self.itemInset, self.itemInset)
@@ -48,6 +64,7 @@ function ItemSlot:_CreateItemSprite()
     self.item:SetAssociatedObject(id)
     self:_UpdateQuantity()
     self.item.alpha = 1
+    self:_UpdateDisabled()
 end
 
 function ItemSlot:_CreateDragItemSprite()
@@ -97,6 +114,7 @@ function ItemSlot.new(parent, object, options)
     local self = setmetatable({}, ItemSlot)
     self.parent = parent
     self.object = object
+    self.disabled = options.disabled == true
     self.tooltipValue = options.tooltip
     self.quantity = stackQuantity(options.quantity)
     self.quantityMode = options.quantityMode or ui.ObjectQuantityDisplayMode.MULTIPLE
@@ -125,6 +143,15 @@ function ItemSlot.new(parent, object, options)
     self:_CreateItemSprite()
     self:_CreateDragItemSprite()
 
+    self.disabledOverlay = ui.Rectangle.new(self.root)
+    self.disabledOverlay:SetPos(self.itemInset, self.itemInset)
+    self.disabledOverlay:SetSize(SLOT_SIZE - self.itemInset * 2, SLOT_SIZE - self.itemInset * 2)
+    self.disabledOverlay.fill = true
+    self.disabledOverlay.rgba = DISABLED_OVERLAY_RGBA
+    self.disabledOverlay.alpha = DISABLED_OVERLAY_ALPHA
+    self.disabledOverlay.clickthrough = true
+    self:_UpdateDisabled()
+
     self:_UpdateTooltip()
     return self
 end
@@ -140,6 +167,11 @@ end
 function ItemSlot:SetQuantity(quantity)
     self.quantity = stackQuantity(quantity)
     self:_UpdateQuantity()
+end
+
+function ItemSlot:SetDisabled(disabled)
+    self.disabled = disabled == true
+    self:_UpdateDisabled()
 end
 
 function ItemSlot:SetTooltip(value)
@@ -160,6 +192,7 @@ function ItemSlot:Destroy()
         self.background = nil
         self.item = nil
         self.dragItem = nil
+        self.disabledOverlay = nil
         self.parent = nil
         self.onObjectChange = nil
     end
