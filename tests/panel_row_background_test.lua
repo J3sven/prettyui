@@ -79,6 +79,8 @@ expect(#panel.dockRowBackgrounds, 2, "dock gets one backdrop per flow row")
 expect(#panel.overlayRowBackgrounds, 2, "overlay gets one backdrop per flow row")
 expect(panel.dockRowBackgrounds[1].rgba, 0x24211EFF, "title row uses first colour")
 expect(panel.dockRowBackgrounds[2].rgba, 0x2E2825FF, "button row uses second colour")
+expect(panel.dockRowBackgrounds[1].x, 0, "title backdrop reaches the left edge")
+expect(panel.dockRowBackgrounds[1].width, 0, "title backdrop reaches the right edge")
 expect(panel.dockRowBackgrounds[1].y, 0, "title backdrop fills top padding")
 expect(panel.dockRowBackgrounds[1].height, 44, "title backdrop ends between rows")
 expect(panel.dockRowBackgrounds[2].y, 44, "button backdrop begins between rows")
@@ -86,7 +88,7 @@ expect(panel.dockRowBackgrounds[2].height, 44, "button backdrop fills bottom hal
 expect(
     panel.dockRowBackgrounds[1].height + panel.dockRowBackgrounds[2].height,
     88,
-    "row backdrops cover full panel content height")
+    "edge-to-edge row backdrops cover the full panel content height")
 expect(panel.dockRowBackgrounds[1].widthAnchor, 1.0, "backdrop fills panel width")
 expect(panel.dockRowBackgrounds[1].movedToBack, true, "backdrop stays behind controls")
 

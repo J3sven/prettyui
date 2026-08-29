@@ -1,4 +1,5 @@
 local RowBackgrounds = {}
+local BACKGROUND_PADDING = 4
 
 function RowBackgrounds.clear(backgrounds)
     for _, background in ipairs(backgrounds or {}) do
@@ -98,6 +99,12 @@ function RowBackgrounds.apply(content, viewportHeight, owner, colours, edgeToEdg
                     (centre + (following.top + following.bottom) * 0.5) * 0.5 + 0.5)
                 left = 0
                 width = 0
+            end
+            if edgeToEdge ~= true then
+                top = top - BACKGROUND_PADDING
+                bottom = bottom + BACKGROUND_PADDING
+                left = left - BACKGROUND_PADDING
+                width = width + BACKGROUND_PADDING * 2
             end
             colourIndex = colourIndex + 1
             local background = ui.Rectangle.new(content)
