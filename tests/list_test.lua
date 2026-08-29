@@ -101,13 +101,29 @@ local list = List.new(parent, {
     height = 96,
     entries = {
         { label = "Selected", id = 1, selected = true },
-        { label = "Enabled", id = 2 },
+        {
+            label = "Enabled",
+            id = 2,
+            backgroundColour = 10,
+            hoverColour = 11,
+            selectedColour = 12,
+            textColour = 13,
+        },
         { label = "Unavailable", id = 3, disabled = true },
         { label = "Fourth", id = 4 },
         { label = "Fifth", id = 5 },
         { label = "Sixth", id = 6 },
     },
 })
+
+expect(list.rows[2].background.rgba, 10, "entry background colour renders")
+expect(list.rows[2].label.rgba, 13, "entry text colour renders")
+list.rows[2].root.subscriptions[ui.Hook.ONMOUSEOVER]()
+expect(list.rows[2].background.rgba, 11, "entry hover colour renders")
+list.rows[2].root.subscriptions[ui.Hook.ONMOUSELEAVE]()
+expect(list.rows[2].background.rgba, 10, "entry background restores after hover")
+list.rows[2].root.subscriptions[ui.Hook.ONCLICK]()
+expect(list.rows[2].background.rgba, 12, "entry selected colour renders")
 
 local wheel = ui.Hook.ONSCROLLWHEEL
 list.rows[1].background.subscriptions[wheel](list.rows[1].background, 1)

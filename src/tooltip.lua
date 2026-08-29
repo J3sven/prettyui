@@ -124,6 +124,16 @@ function Tooltip.moveContextTooltipsToFront(collection)
     moveContextTooltipsToFront(contexts[collection])
 end
 
+local function hideContextTooltips(context)
+    if context == nil or not context.active then return end
+    for _, tooltip in ipairs(context.tooltips) do tooltip:Hide() end
+    for _, child in ipairs(context.children) do hideContextTooltips(child) end
+end
+
+function Tooltip.hideContextTooltips(collection)
+    hideContextTooltips(contexts[collection])
+end
+
 function Tooltip.bind(owner, target, parent, value, field)
     field = field or "tooltip"
     owner._tooltipBindings = owner._tooltipBindings or {}

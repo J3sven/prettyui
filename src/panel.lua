@@ -7,6 +7,7 @@ local InterfaceMouse = require("src/core/mouse")
 local List = require("src/list")
 local Layout = require("src/core/layout")
 local Scroll = require("src/core/scroll")
+local RowBackgrounds = require("src/core/row_backgrounds")
 local Slider = require("src/slider")
 local TextField = require("src/text_field")
 local Tabs = require("src/tabs")
@@ -284,6 +285,12 @@ function Panel.new(parent, options, flowManaged)
     self.popoutClickthrough = options.popoutClickthrough == true
     self.popoutBackgroundAlpha = clampAlpha(options.popoutBackgroundAlpha or options.backgroundAlpha)
     self.onPopoutChange = options.onPopoutChange
+    self.rowBackgroundColours = options.rowBackgroundColours
+        or options.rowBackgroundColors
+        or {}
+    self.rowBackgroundEdgeToEdge = options.rowBackgroundEdgeToEdge == true
+    self.dockRowBackgrounds = {}
+    self.overlayRowBackgrounds = {}
     self.poppedOut = self._canPopout and options.poppedOut == true
 
     self.dock = createSurface(parent, {
@@ -532,6 +539,23 @@ function Panel:SetScrollable(scrollable)
     self.scrollable = self.dock.scroll.scrollable
 end
 
+function Panel:RefreshRowBackgrounds()
+    RowBackgrounds.clear(self.dockRowBackgrounds)
+    RowBackgrounds.clear(self.overlayRowBackgrounds)
+    self.dockRowBackgrounds = RowBackgrounds.apply(
+        self.dock.content,
+        self.dock.container.height,
+        self.dockOwner,
+        self.rowBackgroundColours,
+        self.rowBackgroundEdgeToEdge)
+    self.overlayRowBackgrounds = RowBackgrounds.apply(
+        self.overlay.content,
+        self.overlay.container.height,
+        self.overlayOwner,
+        self.rowBackgroundColours,
+        self.rowBackgroundEdgeToEdge)
+end
+
 function Panel:ScrollToChild(child, topOffset)
     if child == nil then return end
     self.dock.scroll:ScrollToChild(child.dock, topOffset)
@@ -758,6 +782,10 @@ function Panel:Destroy()
     if self.dock and self.dock.content then Tooltip.unregisterContext(self.dock.content) end
     if self.overlay and self.overlay.content then Tooltip.unregisterContext(self.overlay.content) end
     Tooltip.unbind(self, "dockTooltip")
+    RowBackgrounds.clear(self.dockRowBackgrounds)
+    RowBackgrounds.clear(self.overlayRowBackgrounds)
+    self.dockRowBackgrounds = {}
+    self.overlayRowBackgrounds = {}
     Tooltip.unbind(self, "overlayTooltip")
     if self.dock and self.dock.scroll then
         self.dock.scroll:Destroy()

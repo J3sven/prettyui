@@ -1,6 +1,7 @@
 local ContentMethods = require("src/core/content_methods")
 local Cursor = require("src/core/cursor")
 local Layout = require("src/core/layout")
+local RowBackgrounds = require("src/core/row_backgrounds")
 local Scroll = require("src/core/scroll")
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
@@ -317,6 +318,16 @@ local function configurePage(tabs, index, options)
         end,
     })
     Layout.configure(page, options.contentLayout)
+    page.rowBackgroundColours = tab.rowBackgroundColours
+        or tab.rowBackgroundColors
+        or options.rowBackgroundColours
+        or options.rowBackgroundColors
+        or {}
+    page.rowBackgroundEdgeToEdge = tab.rowBackgroundEdgeToEdge
+    if page.rowBackgroundEdgeToEdge == nil then
+        page.rowBackgroundEdgeToEdge = options.rowBackgroundEdgeToEdge == true
+    end
+    page.rowBackgrounds = {}
 
     page.tooltipContext = Tooltip.registerContext(page.content, tooltipParent, function(target)
         local rootX, rootY = page._scroll:_AbsolutePosition()
@@ -458,10 +469,22 @@ function Tabs:SetScrollable(scrollable)
     for _, page in ipairs(self.pages) do page:SetScrollable(self.scrollable) end
 end
 
+function TabPage:RefreshRowBackgrounds()
+    RowBackgrounds.clear(self.rowBackgrounds)
+    self.rowBackgrounds = RowBackgrounds.apply(
+        self.content,
+        self._scroll.height,
+        self,
+        self.rowBackgroundColours,
+        self.rowBackgroundEdgeToEdge)
+end
+
 function Tabs:Destroy()
     if self.root then Tooltip.unregisterContext(self.root) end
     for _, tab in ipairs(self.tabs) do Tooltip.unbind(tab, "tooltipAttachment") end
     for _, page in ipairs(self.pages) do
+        RowBackgrounds.clear(page.rowBackgrounds)
+        page.rowBackgrounds = {}
         if page.content then Tooltip.unregisterContext(page.content) end
         Layout.destroyManaged(page)
         if page._scroll then page._scroll:Destroy() page._scroll = nil end
@@ -472,14 +495,8 @@ function Tabs:Destroy()
     if self.root then self.root:Destroy() self.root = nil end
 end
 
--- A page is a normal single-surface host, but recursive tabs and popout panels
--- are intentionally not part of its public content API.
-ContentMethods.installSingle(TabPage, {
-    exclude = {
-        AddPanel = true,
-        AddTabs = true,
-    },
-})
+-- A page is a normal single-surface content host, including nested panels and tabs.
+ContentMethods.installSingle(TabPage)
 Scroll.install(TabPage)
 
 return Tabs

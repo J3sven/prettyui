@@ -71,8 +71,13 @@ config = {
     },
 }
 
+local tabPageInstalled = false
+local tabPageInstallOptions
 package.loaded["src/core/content_methods"] = {
-    installSingle = function() end,
+    installSingle = function(_, options)
+        tabPageInstalled = true
+        tabPageInstallOptions = options
+    end,
 }
 package.loaded["src/core/cursor"] = {
     apply = function() end,
@@ -80,6 +85,15 @@ package.loaded["src/core/cursor"] = {
 package.loaded["src/core/layout"] = {
     configure = function() end,
     destroyManaged = function() end,
+}
+local appliedRowColours
+package.loaded["src/core/row_backgrounds"] = {
+    clear = function() end,
+    apply = function(_, _, _, colours, edgeToEdge)
+        appliedRowColours = colours
+        expect(edgeToEdge, false, "tab page row backgrounds default to padded bounds")
+        return {}
+    end,
 }
 package.loaded["src/core/sprites"] = {
     DIVIDER = 1,
@@ -104,9 +118,19 @@ package.loaded["src/core/wheel"] = {
 
 local Tabs = require("src/tabs")
 local parent = component(nil, "parent")
-local tabs = Tabs.new(parent, { "Misc" })
+local tabs = Tabs.new(parent, { "Misc" }, {
+    rowBackgroundColours = { 10, 20 },
+})
 local tab = tabs:GetTab(1)
 
+expect(tabPageInstalled, true, "tab pages install shared content helpers")
+local tabPageExclusions = tabPageInstallOptions and tabPageInstallOptions.exclude or {}
+expect(tabPageExclusions.AddPanel, nil, "tab pages expose non-popout panels")
+expect(tabPageExclusions.AddTabs, nil, "tab pages expose nested tabs")
+local page = tabs:GetPage(1)
+page:RefreshRowBackgrounds()
+expect(appliedRowColours[1], 10, "tab pages inherit row background colours")
+expect(appliedRowColours[2], 20, "tab pages preserve alternating row colours")
 expect(tab.width, 90, "short text leaves enough room for both end sprites")
 expect(tab.left.width + 30 <= tab.width, true, "the left and right end sprites do not overlap")
 expect(tab.middle.width, -60, "the middle strip is anchored between both caps")

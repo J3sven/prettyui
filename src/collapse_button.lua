@@ -242,6 +242,7 @@ function CollapseButton:AddFancyButton(text, action, options)
     return button
 end
 
+
 function CollapseButton:AddSlider(options)
     options = copyOptions(options)
     if options._onScrollWheel == nil then options._onScrollWheel = self._onScrollWheel end

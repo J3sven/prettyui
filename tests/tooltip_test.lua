@@ -129,4 +129,30 @@ expect(Tooltip.set(owner, "Added again"), true, "a removed tooltip can be added 
 expect(Tooltip.unbind(owner), true, "bindings can be destroyed")
 expect(Tooltip.set(owner, "Ignored"), false, "destroyed bindings reject updates")
 
+local contextCollection = component()
+local context = Tooltip.registerContext(
+    contextCollection,
+    parent,
+    function(item) return item.x, item.y end)
+local contextTarget = component()
+contextTarget.width = 20
+contextTarget.height = 20
+local contextTooltip = Tooltip.attach(contextTarget, contextCollection, "Context")
+contextTooltip:Show()
+
+local childCollection = component()
+Tooltip.registerContext(
+    childCollection,
+    parent,
+    function(item) return item.x, item.y end,
+    context)
+local childTarget = component()
+childTarget.width = 20
+childTarget.height = 20
+local childTooltip = Tooltip.attach(childTarget, childCollection, "Child")
+childTooltip:Show()
+
+Tooltip.hideContextTooltips(contextCollection)
+expect(contextTooltip.root.hidden, true, "context tooltip hides with its window")
+expect(childTooltip.root.hidden, true, "nested panel tooltip hides with its window")
 print("tooltip_test: ok")

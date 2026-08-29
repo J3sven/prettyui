@@ -1,0 +1,143 @@
+local function expect(actual, expected, message)
+    if actual ~= expected then
+        error(message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
+    end
+end
+
+local function component(parent)
+    local value = { parent = parent, subscriptions = {} }
+    function value:SetPos(x, y, xAnchor, yAnchor)
+        self.x, self.y = x, y
+        self.xAnchor, self.yAnchor = xAnchor, yAnchor
+    end
+    function value:SetSize(width, height, widthAnchor, heightAnchor)
+        self.width, self.height = width, height
+        self.widthAnchor, self.heightAnchor = widthAnchor, heightAnchor
+    end
+    function value:MoveToFront() self.movedToFront = true end
+    function value:MoveToBack() self.movedToBack = true end
+    function value:Subscribe(hook, callback) self.subscriptions[hook] = callback end
+    function value:Destroy() self.destroyed = true end
+    return value
+end
+
+local created = {}
+ui = {
+    AlignMode = { CENTRE = 1 },
+    Hook = {
+        ONCLICK = 1,
+        ONMOUSEOVER = 2,
+        ONMOUSELEAVE = 3,
+    },
+    Layer = { new = component },
+    Sprite = { new = component },
+    Rectangle = {
+        new = function(parent)
+            local rectangle = component(parent)
+            created[#created + 1] = rectangle
+            return rectangle
+        end,
+    },
+}
+id = { Font = { CINZEL_13PT_BOLD = 1 } }
+
+package.loaded["src/core/sprites"] = {
+    WINDOW_BACKGROUND = 1,
+    BORDER_LEFT = 2,
+    BORDER_BOTTOM = 3,
+    BORDER_CORNER = 4,
+    TITLEBAR_LEFT = 5,
+    TITLEBAR_CENTRE_LEFT = 6,
+    TITLEBAR_CENTRE = 7,
+    TITLEBAR_CENTRE_RIGHT = 8,
+    TITLEBAR_RIGHT = 9,
+    CLOSE = 10,
+    CLOSE_ACTIVE = 11,
+}
+package.loaded["src/core/content_methods"] = { installSingle = function() end }
+package.loaded["src/text"] = { title = function(parent) return component(parent) end }
+package.loaded["src/tooltip"] = {
+    getContext = function() return nil end,
+    registerContext = function() return {} end,
+    bind = function() end,
+    unbind = function() end,
+    unregisterContext = function() end,
+    hideContextTooltips = function() end,
+}
+package.loaded["src/core/layout"] = {
+    configure = function(owner)
+        owner._managedFlowEntries = {}
+        owner._flowLayout = { paddingLeft = 14, paddingRight = 14 }
+    end,
+    destroyManaged = function() end,
+}
+package.loaded["src/core/mouse"] = {}
+package.loaded["src/core/scroll"] = {
+    attach = function(owner, _, options)
+        owner.viewport = component()
+        owner.content = component(owner.viewport)
+        owner.contentHeight = options.contentHeight or 0
+        owner._scroll = {
+            height = 88,
+            Refresh = function() end,
+            Destroy = function(self) self.destroyed = true end,
+        }
+    end,
+    install = function() end,
+}
+
+package.loaded["src/window"] = nil
+local Window = require("src/window")
+local window = Window.new(component(), {
+    width = 300,
+    height = 140,
+    contentHeight = 88,
+    rowBackgroundColors = { 0x24211EFF, 0x2E2825FF },
+})
+window._managedFlowEntries = {
+    { placement = { y = 10, height = 24 } },
+    { placement = { y = 10, height = 24 } },
+    { placement = { y = 54, height = 24 } },
+    { placement = { y = 54, height = 24 } },
+    { placement = { y = 5, height = 80, _flowAbsolute = true } },
+}
+
+expect(window.rowBackgroundEdgeToEdge, false, "edge-to-edge backgrounds default off")
+window:RefreshRowBackgrounds()
+expect(#window.rowBackgrounds, 2, "window gets one backdrop per flow row")
+expect(window.rowBackgrounds[1].rgba, 0x24211EFF, "first row uses first colour")
+expect(window.rowBackgrounds[2].rgba, 0x2E2825FF, "second row uses second colour")
+expect(window.rowBackgrounds[1].x, 14, "standard backdrop respects left padding")
+expect(window.rowBackgrounds[1].width, -28, "standard backdrop respects horizontal padding")
+expect(window.rowBackgrounds[1].y, 10, "standard backdrop starts at the row")
+expect(window.rowBackgrounds[1].height, 24, "standard backdrop matches row height")
+expect(window.rowBackgrounds[1].widthAnchor, 1.0, "standard backdrop fills padded row width")
+expect(window.rowBackgrounds[1].movedToBack, true, "backdrop stays behind controls")
+
+local standardBackground = window.rowBackgrounds[1]
+for index = 1, 4 do
+    window._managedFlowEntries[index].placement.rowBackgroundGroup = "section"
+end
+window:RefreshRowBackgrounds()
+expect(standardBackground.destroyed, true, "grouping removes stale row backdrops")
+expect(#window.rowBackgrounds, 1, "consecutive rows with one group share a backdrop")
+expect(window.rowBackgrounds[1].y, 10, "group backdrop starts at its first row")
+expect(window.rowBackgrounds[1].height, 68, "group backdrop spans through its final row")
+expect(window.rowBackgrounds[1].rgba, 0x24211EFF, "group advances the colour once")
+
+local groupedBackground = window.rowBackgrounds[1]
+for index = 1, 4 do
+    window._managedFlowEntries[index].placement.rowBackgroundGroup = nil
+end
+window.rowBackgroundEdgeToEdge = true
+window:RefreshRowBackgrounds()
+expect(groupedBackground.destroyed, true, "mode change removes grouped row backdrops")
+expect(window.rowBackgrounds[1].x, 0, "edge-to-edge backdrop reaches the left edge")
+expect(window.rowBackgrounds[1].width, 0, "edge-to-edge backdrop reaches the right edge")
+expect(window.rowBackgrounds[1].y, 0, "edge-to-edge backdrop fills top padding")
+expect(window.rowBackgrounds[1].height, 44, "edge-to-edge backdrop ends between rows")
+local activeBackground = window.rowBackgrounds[1]
+window:Destroy()
+expect(activeBackground.destroyed, true, "destroy removes row backdrops")
+
+print("window_row_background_test: ok")

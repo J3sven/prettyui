@@ -5,6 +5,7 @@ local Tooltip = require("src/tooltip")
 local Layout = require("src/core/layout")
 local InterfaceMouse = require("src/core/mouse")
 local Scroll = require("src/core/scroll")
+local RowBackgrounds = require("src/core/row_backgrounds")
 
 local Window = {}
 Window.__index = Window
@@ -46,6 +47,11 @@ function Window.new(parent, options)
     self.maxWidth = options.maxWidth
     self.maxHeight = options.maxHeight
     self.overlays = {}
+    self.rowBackgroundColours = options.rowBackgroundColours
+        or options.rowBackgroundColors
+        or {}
+    self.rowBackgroundEdgeToEdge = options.rowBackgroundEdgeToEdge == true
+    self.rowBackgrounds = {}
 
     self.root = ui.Layer.new(parent)
     self.root.clickthrough = false
@@ -278,6 +284,16 @@ function Window:SetTooltip(value)
     return Tooltip.set(self, value)
 end
 
+function Window:RefreshRowBackgrounds()
+    RowBackgrounds.clear(self.rowBackgrounds)
+    self.rowBackgrounds = RowBackgrounds.apply(
+        self.content,
+        self._scroll.height,
+        self,
+        self.rowBackgroundColours,
+        self.rowBackgroundEdgeToEdge)
+end
+
 -- A window is a standard single-surface content host. Component definitions and
 -- flow defaults live in content_methods rather than being repeated here.
 ContentMethods.installSingle(Window)
@@ -311,6 +327,7 @@ function Window:Show()
 end
 
 function Window:Close()
+    if self.content then Tooltip.hideContextTooltips(self.content) end
     if self.onClose then self.onClose(self) end
     if self.destroyOnClose then
         self:Destroy()
@@ -323,6 +340,8 @@ end
 
 function Window:Destroy()
     self:_SyncOverlays(true)
+    RowBackgrounds.clear(self.rowBackgrounds)
+    self.rowBackgrounds = {}
     Layout.destroyManaged(self)
     if self.content then
         Tooltip.unregisterContext(self.content)

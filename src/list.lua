@@ -28,6 +28,23 @@ local function entryParts(entry, fallbackID)
     return tostring(entry), fallbackID
 end
 
+local function rowBackgroundColour(list, entry, hovered)
+    if entry.selected then
+        return entry.selectedColour or list.selectedColour
+    end
+    if hovered then
+        return entry.hoverColour or list.hoverColour
+    end
+    return entry.backgroundColour or 0x00000000
+end
+
+local function rowTextColour(list, entry)
+    if list.disabled or not entry.enabled then
+        return entry.disabledTextColour or list.disabledTextColour
+    end
+    return entry.textColour or list.textColour
+end
+
 local function rectangle(parent, colour, fill)
     local component = ui.Rectangle.new(parent)
     component:SetSize(0, 0, 1.0, 1.0)
@@ -323,10 +340,8 @@ end
 
 function List:_RefreshRows()
     for _, row in ipairs(self.rows) do
-        row.background.rgba = row.entry.selected and self.selectedColour or 0x00000000
-        row.label.rgba = (self.disabled or not row.entry.enabled)
-            and self.disabledTextColour
-            or self.textColour
+        row.background.rgba = rowBackgroundColour(self, row.entry, false)
+        row.label.rgba = rowTextColour(self, row.entry)
     end
 end
 
@@ -344,7 +359,7 @@ function List:_RebuildRows()
             row.clickthrough = self.disabled or not entry.enabled
             visibleIndex = visibleIndex + 1
 
-            local rowBackground = rectangle(row, entry.selected and self.selectedColour or 0x00000000)
+            local rowBackground = rectangle(row, rowBackgroundColour(self, entry, false))
             rowBackground:Subscribe(ui.Hook.ONSCROLLWHEEL, function(component, delta)
                 return self:_OnScrollWheel(component, delta)
             end)
@@ -367,7 +382,7 @@ function List:_RebuildRows()
             label:SetSize(-left - 6, self.entryHeight, 1.0, 0)
             label.content = entry.text
             label.font = self.font
-            label.rgba = (self.disabled or not entry.enabled) and self.disabledTextColour or self.textColour
+            label.rgba = rowTextColour(self, entry)
             label.isShadowed = self.shadowed
             label.maxLines = 1
             label.alignVertical = ui.AlignMode.CENTRE
@@ -381,11 +396,11 @@ function List:_RebuildRows()
 
             if not self.disabled and entry.enabled then
                 row:Subscribe(ui.Hook.ONMOUSEOVER, function()
-                    rowBackground.rgba = entry.selected and self.selectedColour or self.hoverColour
+                    rowBackground.rgba = rowBackgroundColour(self, entry, true)
                     return true
                 end)
                 row:Subscribe(ui.Hook.ONMOUSELEAVE, function()
-                    rowBackground.rgba = entry.selected and self.selectedColour or 0x00000000
+                    rowBackground.rgba = rowBackgroundColour(self, entry, false)
                     return true
                 end)
                 row:Subscribe(ui.Hook.ONCLICK, function()
@@ -454,6 +469,21 @@ function List:SetEntries(entries)
                 visible = type(value) ~= "table" or value.visible ~= false,
                 selected = type(value) == "table" and value.selected == true,
                 icon = type(value) == "table" and value.icon or nil,
+                backgroundColour = type(value) == "table"
+                    and (value.backgroundColour or value.backgroundColor)
+                    or nil,
+                hoverColour = type(value) == "table"
+                    and (value.hoverColour or value.hoverColor)
+                    or nil,
+                selectedColour = type(value) == "table"
+                    and (value.selectedColour or value.selectedColor)
+                    or nil,
+                textColour = type(value) == "table"
+                    and (value.textColour or value.textColor or value.colour or value.color)
+                    or nil,
+                disabledTextColour = type(value) == "table"
+                    and (value.disabledTextColour or value.disabledTextColor)
+                    or nil,
             }
             table.insert(self.entries, entry)
             self.entriesByID[entryID] = entry
