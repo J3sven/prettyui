@@ -208,6 +208,12 @@ function Layout.remove(owner, component)
     return removed
 end
 
+local function refreshRowBackgrounds(owner)
+    if type(owner.RefreshRowBackgrounds) == "function" then
+        owner:RefreshRowBackgrounds()
+    end
+end
+
 function Layout.resize(owner, component, height)
     local root = componentRoot(component)
     if root == nil then return end
@@ -223,6 +229,7 @@ function Layout.resize(owner, component, height)
     if layout.row and layout.row.y == root.y then
         layout.row.height = height
         growContent(owner, root.y + height)
+        refreshRowBackgrounds(owner)
         return
     end
 
@@ -240,6 +247,7 @@ function Layout.resize(owner, component, height)
     end
     layout.nextY = layout.nextY + delta
     if owner.SetContentHeight then owner:SetContentHeight(owner.contentHeight + delta) end
+    refreshRowBackgrounds(owner)
 end
 
 function Layout.destroyManaged(owner)

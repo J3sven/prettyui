@@ -14,9 +14,13 @@ function RowBackgrounds.apply(content, viewportHeight, owner, colours, edgeToEdg
     local rowsByY = {}
     for _, entry in ipairs(owner._managedFlowEntries or {}) do
         local placement = entry.placement or {}
+        local component = entry.component
+        local root = component and (component.root or component) or nil
         if placement._flowAbsolute ~= true then
-            local y = math.floor(tonumber(placement.y) or 0)
-            local height = math.max(0, math.floor(tonumber(placement.height) or 0))
+            local y = math.floor(tonumber(root and root.y) or tonumber(placement.y) or 0)
+            local height = math.max(
+                0,
+                math.floor(tonumber(root and root.height) or tonumber(placement.height) or 0))
             local row = rowsByY[y]
             if row == nil then
                 row = { top = y, bottom = y + height }

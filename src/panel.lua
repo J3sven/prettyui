@@ -20,6 +20,24 @@ Panel.__index = Panel
 local PanelContent = {}
 PanelContent.__index = PanelContent
 Scroll.install(PanelContent)
+local function refreshPanelRows(panel, surface, owner, key)
+    RowBackgrounds.clear(panel[key])
+    panel[key] = RowBackgrounds.apply(
+        surface.content,
+        surface.container.height,
+        owner,
+        panel.rowBackgroundColours,
+        panel.rowBackgroundEdgeToEdge)
+end
+
+function PanelContent:RefreshRowBackgrounds()
+    local panel = self._rowBackgroundPanel
+    local surface = self._rowBackgroundSurface
+    local key = self._rowBackgroundKey
+    if panel == nil or surface == nil or key == nil then return end
+    refreshPanelRows(panel, surface, self, key)
+end
+
 
 local BORDER_SIZE = 4
 local TOGGLE_SIZE = 20
@@ -321,6 +339,12 @@ function Panel.new(parent, options, flowManaged)
     local dockTooltipParent = parentContext and parentContext.parent or parent
     self.dockOwner = configureOwner(self.dock, options, parentContext, dockTooltipParent)
     self.overlayOwner = configureOwner(self.overlay, options, nil, overlayParent)
+    self.dockOwner._rowBackgroundPanel = self
+    self.dockOwner._rowBackgroundSurface = self.dock
+    self.dockOwner._rowBackgroundKey = "dockRowBackgrounds"
+    self.overlayOwner._rowBackgroundPanel = self
+    self.overlayOwner._rowBackgroundSurface = self.overlay
+    self.overlayOwner._rowBackgroundKey = "overlayRowBackgrounds"
     self.root = self.dock.root
     self.content = self.dock.content
     self.overlayContent = self.overlay.content
@@ -540,20 +564,8 @@ function Panel:SetScrollable(scrollable)
 end
 
 function Panel:RefreshRowBackgrounds()
-    RowBackgrounds.clear(self.dockRowBackgrounds)
-    RowBackgrounds.clear(self.overlayRowBackgrounds)
-    self.dockRowBackgrounds = RowBackgrounds.apply(
-        self.dock.content,
-        self.dock.container.height,
-        self.dockOwner,
-        self.rowBackgroundColours,
-        self.rowBackgroundEdgeToEdge)
-    self.overlayRowBackgrounds = RowBackgrounds.apply(
-        self.overlay.content,
-        self.overlay.container.height,
-        self.overlayOwner,
-        self.rowBackgroundColours,
-        self.rowBackgroundEdgeToEdge)
+    refreshPanelRows(self, self.dock, self.dockOwner, "dockRowBackgrounds")
+    refreshPanelRows(self, self.overlay, self.overlayOwner, "overlayRowBackgrounds")
 end
 
 function Panel:ScrollToChild(child, topOffset)
