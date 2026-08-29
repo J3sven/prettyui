@@ -131,8 +131,9 @@ local radio = RadioButton.new(parent, choices, {
     inline = true,
     width = 240,
 })
-expect(radio.root.height, 44, "inline placement does not change radio choice layout")
-expect(radio.items[2].row.x, 0, "radio choices remain left-aligned")
-expect(radio.items[2].row.y, 22, "radio choices remain stacked")
+expect(radio.root.height, 22, "inline radio root has one-row height")
+expect(radio.items[1].row.y, 0, "first inline radio starts on the row")
+expect(radio.items[2].row.y, 0, "second inline radio shares the row")
+expect(radio.items[2].row.x > radio.items[1].row.x, true, "inline radio choices advance horizontally")
 
 print("selection_button_test: ok")

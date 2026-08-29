@@ -74,9 +74,9 @@ local function measureInlineWidth(choices)
     return math.max(MIN_WIDTH, width)
 end
 
-function SelectionButton.getSize(kind, choices, options)
+function SelectionButton.getSize(choices, options)
     options = options or {}
-    local choicesInline = kind == "checkbox" and options.inline == true
+    local choicesInline = options.inline == true
     local width = options.width
     if width == nil then
         width = choicesInline and measureInlineWidth(choices) or measureWidth(choices)
@@ -87,8 +87,8 @@ end
 function SelectionButton.new(kind, parent, choices, options)
     options = options or {}
     local items = normalizeChoices(choices)
-    local choicesInline = kind == "checkbox" and options.inline == true
-    local width, height = SelectionButton.getSize(kind, items, options)
+    local choicesInline = options.inline == true
+    local width, height = SelectionButton.getSize(items, options)
 
     local self = setmetatable({}, SelectionButton)
     self.kind = kind
