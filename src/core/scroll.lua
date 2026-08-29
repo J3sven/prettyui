@@ -43,6 +43,7 @@ function Scroll.new(parent, options)
     self.scrollStep = options.scrollStep or 32
     self.requestedContentHeight = math.max(0, options.contentHeight or 0)
     self.scrollY = 0
+    self.thumbCaptureExpanded = false
     self.parentWheelHandler = options._onScrollWheel
     self.ownerWindow = options.ownerWindow or findOwnerWindow(options.parentContext)
     self.overlayParent = options.overlayParent or parent
@@ -136,18 +137,13 @@ function Scroll.new(parent, options)
 
     self.thumbDrag:Subscribe(ui.Hook.ONCLICK, function(component, x, y)
         if self.clickthrough or not self.scrollbarVisible then return true end
-        InterfaceMouse.BeginCapture(component)
+        InterfaceMouse.BeginScreenCapture(component, x, y)
         local mouse = InterfaceMouse.GetPosition(component, x, y)
         if mouse then self.dragStart = { mouseY = mouse.y, scrollY = self.scrollY } end
-        self.thumbDrag:SetPos(0, 0)
-        self.thumbDrag:SetSize(0, 0, 1.0, 1.0)
-        self.thumbDrag:MoveToFront()
+        self.thumbCaptureExpanded = false
         return false
     end)
     self.thumbDrag:Subscribe(ui.Hook.ONHOLD, function(component, x, y)
-        return self:_UpdateDrag(component, x, y)
-    end)
-    self.thumbDrag:Subscribe(ui.Hook.ONDRAG, function(component, x, y)
         return self:_UpdateDrag(component, x, y)
     end)
     self.thumbDrag:Subscribe(ui.Hook.ONRELEASE, function() return self:_StopDrag() end)
@@ -243,9 +239,9 @@ end
 
 function Scroll:_LayoutThumbDrag()
     if self.thumbDrag == nil or self.root == nil then return end
-    -- ONCLICK expands this layer across the overlay parent so ONHOLD/ONDRAG
-    -- continue outside the scrollbar. Window overlay synchronization can run
-    -- during SetScrollPosition; do not collapse the active capture back onto
+    -- The first ONHOLD expands this layer across the overlay parent so later
+    -- events continue outside the scrollbar. Window overlay synchronization can
+    -- run during SetScrollPosition; do not collapse the active capture back onto
     -- the visual thumb until release.
     if self.dragStart ~= nil then return end
     local rootX, rootY = self:_AbsolutePosition()
@@ -313,6 +309,16 @@ end
 function Scroll:_UpdateDrag(component, x, y)
     local mouse = InterfaceMouse.GetPosition(component, x, y)
     if self.dragStart and mouse then
+        if not self.thumbCaptureExpanded then
+            self.thumbCaptureExpanded = true
+            self.dragStart.mouseY = mouse.y
+            self.dragStart.scrollY = self.scrollY
+            self.thumbDrag:SetPos(0, 0)
+            self.thumbDrag:SetSize(0, 0, 1.0, 1.0)
+            self.thumbDrag:MoveToFront()
+            return false
+        end
+
         local thumbTravel = self.trackHeight - self.thumbHeight
         local maxScroll = self.scrollHeight - self.height
         if thumbTravel > 0 then
@@ -329,6 +335,7 @@ end
 function Scroll:_StopDrag()
     InterfaceMouse.EndCapture(self.thumbDrag)
     self.dragStart = nil
+    self.thumbCaptureExpanded = false
     self:_LayoutThumbDrag()
     return false
 end

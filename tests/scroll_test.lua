@@ -4,6 +4,13 @@ local function expect(actual, expected, message)
     end
 end
 
+local rawMousePosition
+Mouse = {
+    GetPosition = function()
+        return rawMousePosition
+    end,
+}
+
 local function component(parent, kind)
     local result = {
         kind = kind,
@@ -210,17 +217,54 @@ expect(
     "installed hosts expose scroll-to-child"
 )
 
+window:SetScrollPosition(0)
 local thumbDrag = window._scroll.thumbDrag
-thumbDrag.subscriptions[ui.Hook.ONCLICK](thumbDrag, 1, 1)
-expect(thumbDrag.width, parent.width, "thumb capture expands across its overlay parent")
-thumbDrag.subscriptions[ui.Hook.ONHOLD](thumbDrag, 1, 40)
+local clickX, clickY = 1, 1
+rawMousePosition = {
+    x = thumbDrag.x + clickX,
+    y = thumbDrag.y + clickY,
+}
+thumbDrag.subscriptions[ui.Hook.ONCLICK](thumbDrag, clickX, clickY)
+expect(thumbDrag.width, 16, "thumb capture stays local until the first hold")
+local scrollPositionUpdates = window._scroll.viewport.scrollPositionUpdates
+thumbDrag.subscriptions[ui.Hook.ONHOLD](thumbDrag, clickX, clickY)
+expect(thumbDrag.width, parent.width, "first hold expands the thumb capture")
+expect(window.scrollY, 0, "capture expansion does not rewind or advance scrolling")
+expect(
+    window._scroll.viewport.scrollPositionUpdates,
+    scrollPositionUpdates,
+    "capture expansion skips native scroll writes"
+)
+
+rawMousePosition = {
+    x = rawMousePosition.x,
+    y = rawMousePosition.y + 40,
+}
+thumbDrag.subscriptions[ui.Hook.ONHOLD](
+    thumbDrag,
+    rawMousePosition.x,
+    rawMousePosition.y
+)
 expect(
     thumbDrag.width,
     parent.width,
     "window overlay synchronization preserves the expanded thumb capture"
 )
-local scrollPositionUpdates = window._scroll.viewport.scrollPositionUpdates
-thumbDrag.subscriptions[ui.Hook.ONHOLD](thumbDrag, 1, 40)
+local draggedScrollY = window.scrollY
+expect(draggedScrollY > 0, true, "thumb hold advances the scroll position")
+local dragStartHandler = thumbDrag.subscriptions[ui.Hook.ONDRAG]
+if dragStartHandler then dragStartHandler(thumbDrag, clickX, clickY) end
+expect(
+    window.scrollY,
+    draggedScrollY,
+    "drag-start coordinates do not rewind an active thumb drag"
+)
+scrollPositionUpdates = window._scroll.viewport.scrollPositionUpdates
+thumbDrag.subscriptions[ui.Hook.ONHOLD](
+    thumbDrag,
+    rawMousePosition.x,
+    rawMousePosition.y
+)
 expect(
     window._scroll.viewport.scrollPositionUpdates,
     scrollPositionUpdates,
