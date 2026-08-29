@@ -177,7 +177,7 @@ function Tooltip.unbind(owner, field)
     return true
 end
 
-function Tooltip.attach(target, parent, value)
+function Tooltip.attach(target, parent, value, hoverHandlers)
     if value == nil then return nil end
     local options = normalize(value)
     local text = tostring(options.text or "")
@@ -251,11 +251,19 @@ function Tooltip.attach(target, parent, value)
     target.clickthrough = false
 
     target:Subscribe(ui.Hook.ONMOUSEOVER, HOOK_ID, function()
-        self:Show()
+        if hoverHandlers and hoverHandlers.onMouseOver then
+            hoverHandlers.onMouseOver(self)
+        else
+            self:Show()
+        end
         return true
     end)
     target:Subscribe(ui.Hook.ONMOUSELEAVE, HOOK_ID, function()
-        self:Hide()
+        if hoverHandlers and hoverHandlers.onMouseLeave then
+            hoverHandlers.onMouseLeave(self)
+        else
+            self:Hide()
+        end
         return true
     end)
 

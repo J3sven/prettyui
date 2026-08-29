@@ -19,6 +19,7 @@ local ENTRY_SPACING = ICON_GAP
 local ROW_SPACING = 2
 local RIGHT_MARGIN = 16
 local TICKS_PER_SECOND = 50
+local TOOLTIP_DELAY_TICKS = math.ceil(0.6 * TICKS_PER_SECOND)
 local TICKS_PER_MINUTE = 60 * TICKS_PER_SECOND
 local MAX_NATIVE_GRAPHIC_DEPTH = 8
 local EVENT_ID = "prettyui_buff_bar"
@@ -72,10 +73,18 @@ local function forEachVisual(entry, callback)
     for _, key in ipairs(ENTRY_VISUAL_KEYS) do callback(entry[key]) end
 end
 
+local function cancelPendingTooltip(entry)
+    entry.pendingTooltip = nil
+    entry.pendingTooltipTicks = nil
+end
+
 local function setEntryHidden(entry, hidden)
     forEachVisual(entry, function(component) component.hidden = hidden end)
     if entry.tooltipTarget ~= nil then entry.tooltipTarget.hidden = hidden end
-    if hidden and entry.tooltip ~= nil then entry.tooltip:Hide() end
+    if hidden then
+        cancelPendingTooltip(entry)
+        if entry.tooltip ~= nil then entry.tooltip:Hide() end
+    end
 end
 
 local function isRendered(component, iteratorVisible)
@@ -315,6 +324,7 @@ local function destroyEntry(bar, entry)
         end
     end
 
+    cancelPendingTooltip(entry)
     forEachVisual(entry, function(component)
         bar.ownDynamicIDs[component.dynamicID] = nil
         component:Destroy()
@@ -362,6 +372,21 @@ local function updateTimers(elapsedTicks)
     stopIfEmpty()
 end
 
+local function showPendingTooltips(elapsedTicks)
+    for _, bar in pairs(bars) do
+        for _, entry in ipairs(bar.entries) do
+            local tooltip = entry.pendingTooltip
+            if tooltip ~= nil then
+                entry.pendingTooltipTicks = entry.pendingTooltipTicks - elapsedTicks
+                if entry.pendingTooltipTicks <= 0 then
+                    cancelPendingTooltip(entry)
+                    if entry.visible and entry.tooltip == tooltip then tooltip:Show() end
+                end
+            end
+        end
+    end
+end
+
 local function ensureStarted()
     if started then return end
     started = true
@@ -377,13 +402,15 @@ local function ensureStarted()
         updateTimers(elapsedTicks)
         if #bars.buff.entries > 0 then layout(bars.buff, false) end
         if #bars.debuff.entries > 0 then layout(bars.debuff, false) end
+        showPendingTooltips(elapsedTicks)
     end)
 end
 
-local function setTooltip(bar, entry, value)
+local function setTooltip(bar, entry, value, deferLayout)
     if entry.tooltip ~= nil and value ~= nil and type(value) ~= "table" then
         return entry.tooltip:SetText(value)
     end
+    cancelPendingTooltip(entry)
     if entry.tooltip ~= nil then
         if entry.tooltip.root ~= nil then
             bar.ownDynamicIDs[entry.tooltip.root.dynamicID] = nil
@@ -403,10 +430,21 @@ local function setTooltip(bar, entry, value)
     if entry.tooltipTarget == nil then
         entry.tooltipTarget = trackComponent(bar, ui.Layer.new(entry.layer))
     end
-    entry.tooltip = Tooltip.attach(entry.tooltipTarget, entry.layer, value)
+    entry.tooltip = Tooltip.attach(entry.tooltipTarget, entry.layer, value, {
+        onMouseOver = function(tooltip)
+            if entry.visible then
+                entry.pendingTooltip = tooltip
+                entry.pendingTooltipTicks = TOOLTIP_DELAY_TICKS
+            end
+        end,
+        onMouseLeave = function(tooltip)
+            if entry.pendingTooltip == tooltip then cancelPendingTooltip(entry) end
+            tooltip:Hide()
+        end,
+    })
     trackComponent(bar, entry.tooltip.root)
     entry.tooltipTarget.hidden = not entry.visible
-    layout(bar, true)
+    if deferLayout ~= true then layout(bar, true) end
     return true
 end
 
@@ -523,16 +561,6 @@ local function add(bar, options)
 
     local visible = options.visible ~= false
 
-    local tooltipTarget = nil
-    local tooltip = nil
-    if options.tooltip ~= nil then
-        -- A topmost transparent layer guarantees that the sprite, border, and
-        -- label cannot intercept the standard PrettyUI tooltip hover hooks.
-        tooltipTarget = trackComponent(bar, ui.Layer.new(layer))
-        tooltip = Tooltip.attach(tooltipTarget, layer, options.tooltip)
-        trackComponent(bar, tooltip.root)
-    end
-
     local entry = {
         id = nextEntryID,
         background = background,
@@ -540,14 +568,13 @@ local function add(bar, options)
         border = border,
         label = label,
         layer = layer,
-        tooltipTarget = tooltipTarget,
-        tooltip = tooltip,
         visible = visible,
         remainingTicks = remainingTicks,
     }
-    setEntryHidden(entry, not visible)
     table.insert(bar.entries, entry)
     bar.entriesByID[entry.id] = entry
+    if options.tooltip ~= nil then setTooltip(bar, entry, options.tooltip, true) end
+    setEntryHidden(entry, not visible)
 
     ensureStarted()
     layout(bar, true)

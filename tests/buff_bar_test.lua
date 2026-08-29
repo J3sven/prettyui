@@ -309,7 +309,18 @@ expect(secondHandle:SetTooltip("Added later"), true, "entries can add tooltips d
 expect(secondHandle:SetTooltip(nil), true, "entries can remove tooltips dynamically")
 
 debuff.tooltipTarget.subscriptions["1:prettyui_tooltip"]()
-expect(debuff.tooltipRoot.hidden, false, "hovering an entry shows its tooltip")
+expect(debuff.tooltipRoot.hidden, true, "hover starts the tooltip delay")
+debuff.tooltipTarget.subscriptions["2:prettyui_tooltip"]()
+logicHandler({ logicTick = 7 })
+expect(debuff.tooltipRoot.hidden, true, "leaving during the delay cancels the tooltip")
+
+debuff.tooltipTarget.subscriptions["1:prettyui_tooltip"]()
+logicHandler({ logicTick = 8 })
+expect(debuff.tooltipRoot.hidden, true, "one logic tick is shorter than the tooltip delay")
+logicHandler({ logicTick = 36 })
+expect(debuff.tooltipRoot.hidden, true, "tooltip remains hidden before thirty logic ticks")
+logicHandler({ logicTick = 37 })
+expect(debuff.tooltipRoot.hidden, false, "thirty logic ticks show the hovered entry tooltip")
 expect(debuff.tooltipRoot.x, 66, "tooltip uses the standard right-side placement")
 expect(debuff.tooltipRoot.y, 101, "tooltip uses the standard target alignment")
 debuff.tooltipTarget.subscriptions["2:prettyui_tooltip"]()
@@ -332,22 +343,22 @@ expect(timedHandle:SetLabel("manual"), false, "timed entries reject manual label
 expect(timed.label.content, "5m", "rejecting SetLabel preserves the timer label")
 
 logicHandler({ logicTick = 100 })
-logicHandler({ logicTick = 14406 })
+logicHandler({ logicTick = 14437 })
 expect(timed.label.content, "13s", "timers below one minute count down in seconds")
 
-logicHandler({ logicTick = 15056 })
+logicHandler({ logicTick = 15087 })
 expect(timed.background.destroyed, true, "timed buffs remove themselves at zero")
 expect(timedHandle:SetVisible(true), false, "expired handles reject visibility changes")
 
 buffLayer.width = 100
 buffLayer.slots.trailing.graphic.spriteID = 101
 buffLayer.slots.secondRow.graphic.spriteID = 102
-logicHandler({ logicTick = 15057 })
+logicHandler({ logicTick = 15088 })
 expect(first.sprite.x, 32, "wrapped custom buffs avoid native occupancy on the second row")
 expect(first.sprite.y, 39, "wrapped custom buffs use the native second-row position")
 
 buffLayer.slots.secondRow.graphic.spriteID = -1
-logicHandler({ logicTick = 15058 })
+logicHandler({ logicTick = 15089 })
 expect(first.sprite.x, 1, "custom buffs stay inside the left edge of an empty second row")
 expect(first.sprite.y, 39, "reclaiming space keeps the custom buff on the second row")
 
