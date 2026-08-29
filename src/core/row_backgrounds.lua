@@ -24,13 +24,16 @@ function RowBackgrounds.apply(content, viewportHeight, owner, colours, edgeToEdg
                 row.bottom = math.max(row.bottom, y + height)
             end
 
-            local group = placement.rowBackgroundGroup
-            if group ~= nil then
-                if row.groupSet and row.group ~= group then
-                    error("Components sharing a flow row must use the same rowBackgroundGroup")
+            if placement.rowBackground ~= false then
+                row.included = true
+                local group = placement.rowBackgroundGroup
+                if group ~= nil then
+                    if row.groupSet and row.group ~= group then
+                        error("Components sharing a flow row must use the same rowBackgroundGroup")
+                    end
+                    row.group = group
+                    row.groupSet = true
                 end
-                row.group = group
-                row.groupSet = true
             end
         end
     end
@@ -43,7 +46,17 @@ function RowBackgrounds.apply(content, viewportHeight, owner, colours, edgeToEdg
     for _, y in ipairs(rowYs) do
         local row = rowsByY[y]
         local region = regions[#regions]
-        if row.groupSet and region and region.groupSet and region.group == row.group then
+        if row.included ~= true then
+            regions[#regions + 1] = {
+                top = row.top,
+                bottom = row.bottom,
+                excluded = true,
+            }
+        elseif row.groupSet
+            and region
+            and region.excluded ~= true
+            and region.groupSet
+            and region.group == row.group then
             region.bottom = math.max(region.bottom, row.bottom)
         else
             regions[#regions + 1] = {
@@ -68,30 +81,34 @@ function RowBackgrounds.apply(content, viewportHeight, owner, colours, edgeToEdg
         paddingRight = tonumber(layout.paddingRight) or 0
     end
 
+    local colourIndex = 0
     for index, region in ipairs(regions) do
-        local top = region.top
-        local bottom = region.bottom
-        local left = paddingLeft
-        local width = -(paddingLeft + paddingRight)
-        if edgeToEdge == true then
-            local centre = (region.top + region.bottom) * 0.5
-            local previous = regions[index - 1]
-            local following = regions[index + 1]
-            top = previous == nil and 0 or math.floor(
-                ((previous.top + previous.bottom) * 0.5 + centre) * 0.5 + 0.5)
-            bottom = following == nil and contentHeight or math.floor(
-                (centre + (following.top + following.bottom) * 0.5) * 0.5 + 0.5)
-            left = 0
-            width = 0
+        if region.excluded ~= true then
+            local top = region.top
+            local bottom = region.bottom
+            local left = paddingLeft
+            local width = -(paddingLeft + paddingRight)
+            if edgeToEdge == true then
+                local centre = (region.top + region.bottom) * 0.5
+                local previous = regions[index - 1]
+                local following = regions[index + 1]
+                top = previous == nil and 0 or math.floor(
+                    ((previous.top + previous.bottom) * 0.5 + centre) * 0.5 + 0.5)
+                bottom = following == nil and contentHeight or math.floor(
+                    (centre + (following.top + following.bottom) * 0.5) * 0.5 + 0.5)
+                left = 0
+                width = 0
+            end
+            colourIndex = colourIndex + 1
+            local background = ui.Rectangle.new(content)
+            background:SetPos(left, top)
+            background:SetSize(width, math.max(0, bottom - top), 1.0, 0)
+            background.fill = true
+            background.rgba = colours[(colourIndex - 1) % #colours + 1]
+            background.clickthrough = true
+            background:MoveToBack()
+            backgrounds[#backgrounds + 1] = background
         end
-        local background = ui.Rectangle.new(content)
-        background:SetPos(left, top)
-        background:SetSize(width, math.max(0, bottom - top), 1.0, 0)
-        background.fill = true
-        background.rgba = colours[(index - 1) % #colours + 1]
-        background.clickthrough = true
-        background:MoveToBack()
-        backgrounds[#backgrounds + 1] = background
     end
 
     return backgrounds

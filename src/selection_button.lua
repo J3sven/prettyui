@@ -10,6 +10,7 @@ local BOX_SIZE = 14
 local ROW_HEIGHT = 22
 local LABEL_X = 22
 local MIN_WIDTH = 80
+local INLINE_CHOICE_GAP = 12
 local TEXT_COLOUR = 0xE7D7B0FF
 local DISABLED_TEXT_COLOUR = 0x777777FF
 
@@ -48,27 +49,46 @@ local function contains(values, target)
     return values[target] == true
 end
 
+local function measureChoiceWidth(choice)
+    local normalized = normalizeChoice(choice)
+    local succeeded, width = pcall(function()
+        return config.Font.MUSEO_SANS_15PT_REGULAR:GetStringWidth(normalized.text, false)
+    end)
+    return LABEL_X + (succeeded and width or #normalized.text * 7)
+end
+
 local function measureWidth(choices)
     local widest = 0
     for _, choice in ipairs(choices) do
-        local normalized = normalizeChoice(choice)
-        local succeeded, width = pcall(function()
-            return config.Font.MUSEO_SANS_15PT_REGULAR:GetStringWidth(normalized.text, false)
-        end)
-        widest = math.max(widest, succeeded and width or #normalized.text * 7)
+        widest = math.max(widest, measureChoiceWidth(choice))
     end
-    return math.max(MIN_WIDTH, LABEL_X + widest)
+    return math.max(MIN_WIDTH, widest)
 end
 
-function SelectionButton.getSize(choices, options)
+local function measureInlineWidth(choices)
+    local width = 0
+    for index, choice in ipairs(choices) do
+        if index > 1 then width = width + INLINE_CHOICE_GAP end
+        width = width + measureChoiceWidth(choice)
+    end
+    return math.max(MIN_WIDTH, width)
+end
+
+function SelectionButton.getSize(kind, choices, options)
     options = options or {}
-    return options.width or measureWidth(choices), #choices * ROW_HEIGHT
+    local choicesInline = kind == "checkbox" and options.inline == true
+    local width = options.width
+    if width == nil then
+        width = choicesInline and measureInlineWidth(choices) or measureWidth(choices)
+    end
+    return width, choicesInline and ROW_HEIGHT or #choices * ROW_HEIGHT
 end
 
 function SelectionButton.new(kind, parent, choices, options)
     options = options or {}
     local items = normalizeChoices(choices)
-    local width, height = SelectionButton.getSize(items, options)
+    local choicesInline = kind == "checkbox" and options.inline == true
+    local width, height = SelectionButton.getSize(kind, items, options)
 
     local self = setmetatable({}, SelectionButton)
     self.kind = kind
@@ -117,10 +137,18 @@ function SelectionButton.new(kind, parent, choices, options)
         return rootX + (target.x or 0), rootY + (target.y or 0)
     end, parentContext)
 
+    local nextX = 0
     for index, item in ipairs(items) do
         local row = ui.Layer.new(self.root)
-        row:SetPos(0, (index - 1) * ROW_HEIGHT)
-        row:SetSize(0, ROW_HEIGHT, 1.0)
+        if choicesInline then
+            local rowWidth = measureChoiceWidth(item)
+            row:SetPos(nextX, 0)
+            row:SetSize(rowWidth, ROW_HEIGHT)
+            nextX = nextX + rowWidth + INLINE_CHOICE_GAP
+        else
+            row:SetPos(0, (index - 1) * ROW_HEIGHT)
+            row:SetSize(0, ROW_HEIGHT, 1.0)
+        end
         item.row = row
         item.hovered = false
         Wheel.bind(row, options)

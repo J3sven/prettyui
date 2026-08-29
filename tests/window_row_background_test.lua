@@ -118,8 +118,22 @@ local standardBackground = window.rowBackgrounds[1]
 for index = 1, 4 do
     window._managedFlowEntries[index].placement.rowBackgroundGroup = "section"
 end
+table.insert(window._managedFlowEntries, 5, {
+    placement = { y = 38, height = 8, rowBackground = false },
+})
 window:RefreshRowBackgrounds()
 expect(standardBackground.destroyed, true, "grouping removes stale row backdrops")
+expect(#window.rowBackgrounds, 2, "an excluded row separates matching groups")
+expect(window.rowBackgrounds[1].y, 10, "background before an exclusion stays on its row")
+expect(window.rowBackgrounds[1].height, 24, "background stops before an excluded row")
+expect(window.rowBackgrounds[2].y, 54, "background resumes after an excluded row")
+expect(window.rowBackgrounds[1].rgba, 0x24211EFF, "excluded row does not consume a colour")
+expect(window.rowBackgrounds[2].rgba, 0x2E2825FF, "colour sequence advances across visible regions")
+
+local splitBackground = window.rowBackgrounds[1]
+table.remove(window._managedFlowEntries, 5)
+window:RefreshRowBackgrounds()
+expect(splitBackground.destroyed, true, "removing an exclusion rebuilds row backdrops")
 expect(#window.rowBackgrounds, 1, "consecutive rows with one group share a backdrop")
 expect(window.rowBackgrounds[1].y, 10, "group backdrop starts at its first row")
 expect(window.rowBackgrounds[1].height, 68, "group backdrop spans through its final row")
@@ -129,13 +143,17 @@ local groupedBackground = window.rowBackgrounds[1]
 for index = 1, 4 do
     window._managedFlowEntries[index].placement.rowBackgroundGroup = nil
 end
+table.insert(window._managedFlowEntries, 5, {
+    placement = { y = 38, height = 8, rowBackground = false },
+})
 window.rowBackgroundEdgeToEdge = true
 window:RefreshRowBackgrounds()
 expect(groupedBackground.destroyed, true, "mode change removes grouped row backdrops")
 expect(window.rowBackgrounds[1].x, 0, "edge-to-edge backdrop reaches the left edge")
 expect(window.rowBackgrounds[1].width, 0, "edge-to-edge backdrop reaches the right edge")
 expect(window.rowBackgrounds[1].y, 0, "edge-to-edge backdrop fills top padding")
-expect(window.rowBackgrounds[1].height, 44, "edge-to-edge backdrop ends between rows")
+expect(window.rowBackgrounds[1].height, 32, "edge backdrop stops before an excluded row")
+expect(window.rowBackgrounds[2].y, 54, "edge backdrop resumes after an excluded row")
 local activeBackground = window.rowBackgrounds[1]
 window:Destroy()
 expect(activeBackground.destroyed, true, "destroy removes row backdrops")
