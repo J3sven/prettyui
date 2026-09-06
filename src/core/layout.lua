@@ -51,6 +51,7 @@ function Layout.place(owner, value, defaults)
     local layout = owner._flowLayout
     local options = copyOptions(value)
     if options._onScrollWheel == nil then options._onScrollWheel = owner._onScrollWheel end
+    if options._scrollController == nil then options._scrollController = owner._scroll end
     local width = options.width or options.size or defaults.width or 0
     local height = options.height or options.size or defaults.height or 0
     local gap = options.marginBottom

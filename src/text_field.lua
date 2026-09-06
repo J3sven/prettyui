@@ -28,6 +28,7 @@ function TextField.new(parent, options)
     self.onChange = options.onChange
     self.onSubmit = options.onSubmit
     self.disabled = options.disabled == true
+    self._scrollController = options._scrollController
 
     self.root = ui.InputField.new(parent)
     self.root.stylesheetID = options.stylesheetID or id.StyleSheet.INPUT_DEFAULT
@@ -77,6 +78,7 @@ function TextField.new(parent, options)
     end)
 
     Tooltip.bind(self, self.root, parent, options.tooltip)
+    if self._scrollController then self._scrollController:RegisterClipTarget(self) end
     return self
 end
 
@@ -112,6 +114,10 @@ function TextField:SetTooltip(value)
 end
 
 function TextField:Destroy()
+    if self._scrollController then
+        self._scrollController:UnregisterClipTarget(self)
+        self._scrollController = nil
+    end
     Tooltip.unbind(self)
     if self.root then self.root:Destroy() self.root = nil end
 end

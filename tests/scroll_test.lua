@@ -13,6 +13,7 @@ Mouse = {
 
 local function component(parent, kind)
     local result = {
+        parent = parent,
         kind = kind,
         x = 0,
         y = 0,
@@ -57,8 +58,26 @@ local function factory(kind)
     return { new = function(parent) return component(parent, kind) end }
 end
 
+local function inputField(parent)
+    local result = component(parent, "input")
+    result.text = {}
+    result.containerSprite = {}
+    function result:Setup(visibility, filterMode, maxLength)
+        self.visibility = visibility
+        self.filterMode = filterMode
+        self.maxLength = maxLength
+    end
+    return result
+end
+
 ui = {
     Layer = factory("layer"),
+    InputField = { new = inputField },
+    Margin = {
+        new = function(left, top, right, bottom)
+            return { left = left, top = top, right = right, bottom = bottom }
+        end,
+    },
     Sprite = factory("sprite"),
     Text = factory("text"),
     Hook = {
@@ -70,14 +89,22 @@ ui = {
         ONSCROLLWHEEL = 6,
         ONMOUSEOVER = 7,
         ONMOUSELEAVE = 8,
+        ONCONTENTCHANGED = 9,
     },
     AlignMode = { TOPLEFT = 1, CENTRE = 2 },
+    TextContentVisibilityMode = { VISIBLE = 1 },
+    InputFieldFilterMode = { NONE = 1 },
+    InputFieldKeyHandlingMode = { DEFAULT = 1 },
+    InputFieldActionResult = { SUBMIT = 1, CONTENT_CHANGE = 2 },
 }
 
 id = {
     Font = {
         MUSEO_SANS_15PT_REGULAR = 1,
         CINZEL_13PT_BOLD = 2,
+    },
+    StyleSheet = {
+        INPUT_DEFAULT = 1,
     },
 }
 
@@ -208,6 +235,12 @@ expect(rows[3].y, removedY, "destroying text reclaims its flow row")
 expect(#window._managedFlowEntries, 4, "destroyed text leaves the flow registry")
 local replacement = window:AddText({ text = "Replacement", height = 30 })
 expect(replacement.y, rows[5].y + rows[5].height + 2, "new text follows the reflowed rows")
+local clippedField = window:AddTextField({ text = "Viewport clipping regression" })
+expect(clippedField.root.hidden, true, "text fields below the viewport are hidden")
+window:ScrollToChild(clippedField, 0)
+expect(clippedField.root.hidden, false, "text fields are restored when scrolled into view")
+window:SetScrollPosition(0)
+expect(clippedField.root.hidden, true, "text fields are hidden again after leaving the viewport")
 window:SetScrollPosition(10)
 expect(window.scrollY, 10, "installed host methods keep public scroll state synchronized")
 window:ScrollToChild(rows[4], 4)

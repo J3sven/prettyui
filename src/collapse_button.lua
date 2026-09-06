@@ -84,6 +84,7 @@ function CollapseButton.new(parent, text, options)
     self.equalizedButtons = {}
     self.onToggle = options.onToggle
     self._onScrollWheel = options._onScrollWheel
+    self._scrollController = options._scrollController
     self.hoverCursor = options.hoverCursor or config.Cursor.CURSOR_BLANK
     self.textColour = options.colour or TEXT_COLOUR
     self.disabledTextColour = options.disabledColour or DISABLED_TEXT_COLOUR
@@ -260,6 +261,9 @@ end
 local function addFullWidthControl(self, module, options)
     options = copyOptions(options)
     if options._onScrollWheel == nil then options._onScrollWheel = self._onScrollWheel end
+    if options._scrollController == nil then
+        options._scrollController = self._scrollController
+    end
     local _, height = module.getSize(options)
     options.x = options.x or 0
     options.y = self:_NextContentY(options)

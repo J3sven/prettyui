@@ -15,6 +15,17 @@ local function clamp(value, minimum, maximum)
     return math.max(minimum, math.min(maximum, value))
 end
 
+local function topRelativeTo(root, ancestor)
+    local top = 0
+    local current = root
+    while current ~= nil and current ~= ancestor do
+        top = top + (current.y or 0)
+        current = current.parent
+    end
+    if current ~= ancestor then return nil end
+    return top
+end
+
 local function sprite(parent, spriteID)
     local component = ui.Sprite.new(parent)
     component.spriteID = spriteID
@@ -51,6 +62,7 @@ function Scroll.new(parent, options)
     self.isVisible = options.isVisible
     self.onLayout = options.onLayout
     self.clickthrough = options.clickthrough == true
+    self.clipTargets = {}
 
     self.root = ui.Layer.new(parent)
     self.root:SetPos(
@@ -227,6 +239,56 @@ function Scroll.install(class)
     end
 end
 
+-- Focused native input text is not clipped by a scrolled ancestor. Clip targets
+-- therefore mirror viewport visibility when they are wholly outside its bounds.
+function Scroll:RegisterClipTarget(target)
+    if target == nil or target.root == nil then return end
+    local entry = {
+        target = target,
+        hiddenByClip = false,
+    }
+    table.insert(self.clipTargets, entry)
+    self:_RefreshClipTargets()
+end
+
+function Scroll:UnregisterClipTarget(target)
+    for index = #self.clipTargets, 1, -1 do
+        local entry = self.clipTargets[index]
+        if entry.target == target then
+            if entry.hiddenByClip and target.root then
+                target.root.hidden = entry.hiddenBeforeClip == true
+            end
+            table.remove(self.clipTargets, index)
+        end
+    end
+end
+
+function Scroll:_RefreshClipTargets()
+    for index = #self.clipTargets, 1, -1 do
+        local entry = self.clipTargets[index]
+        local root = entry.target and entry.target.root or nil
+        if root == nil then
+            table.remove(self.clipTargets, index)
+        else
+            local top = topRelativeTo(root, self.content)
+            local clipped = top ~= nil and
+                (top + (root.height or 0) <= self.scrollY or
+                    top >= self.scrollY + self.height)
+            if clipped then
+                if not entry.hiddenByClip then
+                    entry.hiddenBeforeClip = root.hidden == true
+                    entry.hiddenByClip = true
+                end
+                root.hidden = true
+            elseif entry.hiddenByClip then
+                root.hidden = entry.hiddenBeforeClip == true
+                entry.hiddenBeforeClip = nil
+                entry.hiddenByClip = false
+            end
+        end
+    end
+end
+
 function Scroll:_ShouldShow()
     return self.scrollbarVisible and
         (self.isVisible == nil or self.isVisible() == true)
@@ -292,6 +354,7 @@ function Scroll:SetScrollPosition(position)
     local maxScroll = self.scrollable and math.max(0, self.scrollHeight - self.height) or 0
     self.scrollY = clamp(math.floor(position or 0), 0, maxScroll)
     self.viewport:SetScrollPos(0, self.scrollY)
+    self:_RefreshClipTargets()
 
     local thumbY = 0
     local thumbTravel = self.trackHeight - self.thumbHeight
@@ -396,6 +459,7 @@ function Scroll:Destroy()
         self.root:Destroy()
         self.root = nil
     end
+    self.clipTargets = {}
     self.ownerWindow = nil
     self.overlayParent = nil
     self.parent = nil
