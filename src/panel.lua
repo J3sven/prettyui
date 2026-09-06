@@ -583,6 +583,51 @@ ContentMethods.installPaired(Panel, function(panel)
     }
 end, pairObjects)
 
+local addPairedTimeGraph = Panel.AddTimeGraph
+
+function Panel:AddTimeGraph(options)
+    local shared = copyOptions(options)
+    shared.bus = shared.bus or require("src/time_graph").CreateEventBus()
+    local proxy
+    local onZoom = shared.onZoom
+    shared.onZoom = function(_, zoom)
+        proxy.dock:SetZoom(zoom, false)
+        proxy.overlay:SetZoom(zoom, false)
+        if onZoom then onZoom(proxy, zoom) end
+    end
+    proxy = addPairedTimeGraph(self, shared)
+    rawset(proxy, "SetZoom", function(_, zoom, notify)
+        local dockChanged = proxy.dock:SetZoom(zoom, false)
+        local overlayChanged = proxy.overlay:SetZoom(zoom, false)
+        local changed = dockChanged or overlayChanged
+        if changed and notify ~= false and onZoom then onZoom(proxy, proxy:GetZoom()) end
+        return changed
+    end)
+    rawset(proxy, "ZoomIn", function() return proxy:SetZoom(proxy:GetZoom() * 2) end)
+    rawset(proxy, "ZoomOut", function() return proxy:SetZoom(proxy:GetZoom() / 2) end)
+    -- Both surfaces receive the same stream, including while one is hidden.
+    -- A snapshot is detached data, not another paired component proxy.
+    rawset(proxy, "GetSnapshot", function()
+        local active = self.poppedOut and proxy.overlay or proxy.dock
+        return active:GetSnapshot()
+    end)
+    return proxy
+end
+
+-- Caller-fed chart updates are mirrored by the normal paired methods. Snapshot
+-- data must come from one surface rather than being wrapped as UI components.
+for _, method in ipairs({ "AddBarChart", "AddHistogram" }) do
+    local addChart = Panel[method]
+    Panel[method] = function(self, options)
+        local proxy = addChart(self, options)
+        rawset(proxy, "GetSnapshot", function()
+            local active = self.poppedOut and proxy.overlay or proxy.dock
+            return active:GetSnapshot()
+        end)
+        return proxy
+    end
+end
+
 function Panel:AddTabs(tabs, options)
     local width, height = Tabs.getSize(tabs, options)
     local proxy

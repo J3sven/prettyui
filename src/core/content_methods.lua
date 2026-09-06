@@ -24,6 +24,9 @@ local COMPONENTS = {
     { method = "AddTitle", textTitle = true },
     { method = "AddSpinner", module = "src/spinner", optionsIndex = 1, width = 29, height = 29 },
     { method = "AddBigSpinner", module = "src/big_spinner", optionsIndex = 1, width = 72, height = 72 },
+    { method = "AddTimeGraph", module = "src/time_graph", optionsIndex = 1, measured = true, fillWidth = true },
+    { method = "AddBarChart", module = "src/bar_chart", optionsIndex = 1, measured = true, fillWidth = true },
+    { method = "AddHistogram", module = "src/histogram", optionsIndex = 1, measured = true, fillWidth = true },
     {
         method = "AddDivider",
         module = "src/divider",

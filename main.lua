@@ -1,6 +1,9 @@
 local TextField = require("src/text_field")
 local RibbonBar = require("src/ribbon_bar")
 local BuffBar = require("src/buff_bar")
+local TimeGraph = require("src/time_graph")
+local BarChart = require("src/bar_chart")
+local Histogram = require("src/histogram")
 
 local resources = Plugin.resources
 TextField.SetDefaultSprite(resources and (resources.input_default or resources["input_default.png"]))
@@ -8,6 +11,7 @@ TextField.SetDefaultSprite(resources and (resources.input_default or resources["
 local PrettyUI = {
     AchievementPopup = require("src/achievement_popup"),
     AnchoredTooltip = require("src/anchored_tooltip"),
+    BarChart = BarChart,
     BigSpinner = require("src/big_spinner"),
     CheckboxButton = require("src/checkbox_button"),
     ColourPicker = require("src/colour_picker"),
@@ -15,6 +19,8 @@ local PrettyUI = {
     CollapseButton = require("src/collapse_button"),
     Divider = require("src/divider"),
     FancyButton = require("src/fancy_button"),
+    Histogram = Histogram,
+    TimeGraph = TimeGraph,
     ItemSlot = require("src/item_slot"),
     ItemGrid = require("src/item_grid"),
     List = require("src/list"),
@@ -44,6 +50,9 @@ RibbonBar.Start()
 function PluginShutdown()
     RibbonBar.Shutdown()
     BuffBar.Shutdown()
+    TimeGraph.Shutdown()
+    BarChart.Shutdown()
+    Histogram.Shutdown()
 end
 
 return PrettyUI
