@@ -74,6 +74,8 @@ end
 function Text.append(owner, value, isTitle)
     local options = textOptions(value)
     options.text = tostring(options.text or "")
+    -- Block titles own their row; inline controls belong to the content below.
+    options._flowBreakAfter = isTitle and options.inline ~= true
     if not isTitle and options.height == nil and options.inline ~= true and owner.contentWidth ~= nil then
         local layout = owner._flowLayout
         local wrapWidth = options.width
@@ -87,10 +89,17 @@ function Text.append(owner, value, isTitle)
         end)
         if succeeded then options.height = math.max(24, lineCount * lineHeight(font, options) + 6) end
     end
-    if options.inline == true and options.width == nil then
+    if options.width == nil and (not isTitle or options.inline == true) then
         local font = fontConfig(options.font, isTitle)
         local succeeded, width = pcall(function() return font:GetStringWidth(options.text, false) end)
-        options.width = (succeeded and width or #options.text * 7) + 4
+        width = (succeeded and width or #options.text * 7) + 4
+        if options.inline == true then
+            options.width = width
+        else
+            -- Keep the wrapping box full-width, but advance inline controls past
+            -- the text rather than treating its anchored width as zero.
+            options._flowWidth = width
+        end
     end
     options = Layout.place(owner, options, {
         height = isTitle and 28 or 24,

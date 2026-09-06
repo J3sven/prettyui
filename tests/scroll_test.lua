@@ -35,6 +35,9 @@ local function component(parent, kind)
         self.width = width + ((parent and parent.width or 0) * (widthAnchor or 0))
         self.height = height + ((parent and parent.height or 0) * (heightAnchor or 0))
     end
+    function result:SetWidth(width, widthAnchor)
+        self.width = width + ((parent and parent.width or 0) * (widthAnchor or 0))
+    end
     function result:SetScrollSize(width, height)
         self.scrollWidth, self.scrollHeight = width, height
     end
@@ -131,6 +134,7 @@ package.loaded["src/core/sprites"] = {
     SCROLL_THUMB_CENTRE = 7,
     SCROLL_THUMB_BOTTOM = 8,
     DIVIDER = 9,
+    CHECKBOX_BUTTON = { empty = 1, selected = 2, emptyHovered = 3, selectedHovered = 4 },
     TEXT_TAB = {
         inactive = { left = 10, middle = 11, right = 12 },
         active = { left = 13, middle = 14, right = 15 },
@@ -371,5 +375,57 @@ expect(
     "the final add row is reachable at the bottom of the scroll range"
 )
 trackerWindow:Destroy()
+
+-- Exercise real paired content methods on two independent scroll/layout owners.
+local dockView = SimpleView.new(parent, { width = 300, height = 400 })
+local overlayView = SimpleView.new(parent, { width = 360, height = 400 })
+local inlinePanel = setmetatable({
+    dockOwner = dockView,
+    overlayOwner = overlayView,
+    dock = { content = dockView.content },
+    overlay = { content = overlayView.content },
+}, Panel)
+local prefix = inlinePanel:AddText("Temporary row")
+local title = inlinePanel:AddTitle("Options")
+local checks = inlinePanel:AddCheckboxButton({ "One", "Two" }, { inline = true })
+local label = inlinePanel:AddText("Name:")
+local field = inlinePanel:AddTextField({ inline = true })
+local following = inlinePanel:AddText("Next row")
+
+local function checkInlineLayout()
+    for _, side in ipairs({ "dock", "overlay" }) do
+        local heading, boxes = title[side], checks[side]
+        expect(boxes.root.y >= heading.y + heading.height + 8, true,
+            side .. " inline checkboxes start below the title and its gap")
+        expect(boxes.items[1].row.y, boxes.items[2].row.y,
+            side .. " checkbox choices still share one row")
+        local text, input = label[side], field[side].root
+        expect(input.y, text.y, side .. " inline text field shares the label row")
+        expect(input.x, text.x + font:GetStringWidth(text.content) + 4 + 8,
+            side .. " inline text field follows the rendered label")
+        expect(input.x + input.width, text.parent.width - 14,
+            side .. " default inline field fills only the remaining row width")
+        expect(following[side].y >= input.y + input.height + 8, true,
+            side .. " following text clears the taller inline field")
+    end
+end
+checkInlineLayout()
+prefix:Destroy()
+checkInlineLayout()
+
+local fixedLabel = inlinePanel:AddText({ text = "Fixed:", width = 110 })
+local fixedField = inlinePanel:AddTextField({ inline = true, width = 100 })
+expect(fixedField.dock.root.x, fixedLabel.dock.x + 110 + 8,
+    "explicit label width takes precedence over measured text")
+following:Destroy()
+expect(fixedField.dock.root.x, fixedLabel.dock.x + 110 + 8,
+    "explicit label width is preserved during reflow")
+checks:Destroy()
+label:Destroy()
+expect(field.dock.root.x, 14, "removing the label moves its field to the row start")
+expect(field.dock.root.x + field.dock.root.width, dockView.content.width - 14,
+    "removing the label expands the field to the remaining content width")
+dockView:Destroy()
+overlayView:Destroy()
 
 print("scroll_test: ok")

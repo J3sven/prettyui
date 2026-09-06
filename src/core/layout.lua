@@ -52,7 +52,7 @@ function Layout.place(owner, value, defaults)
     local options = copyOptions(value)
     if options._onScrollWheel == nil then options._onScrollWheel = owner._onScrollWheel end
     if options._scrollController == nil then options._scrollController = owner._scroll end
-    local width = options.width or options.size or defaults.width or 0
+    local width = options._flowWidth or options.width or options.size or defaults.width or 0
     local height = options.height or options.size or defaults.height or 0
     local gap = options.marginBottom
     if gap == nil then gap = defaults.gap or layout.rowGap end
@@ -92,12 +92,21 @@ function Layout.place(owner, value, defaults)
         if defaults.fillWidth == true then
             options.width = -(layout.paddingLeft + layout.paddingRight)
             options.widthAnchor = options.widthAnchor == nil and 1.0 or options.widthAnchor
+            options._flowFillWidth = options.inline == true and options.widthAnchor == 1.0
+            if options._flowFillWidth then
+                options.width = -(options.x + layout.paddingRight)
+                if not absolute and owner.contentWidth ~= nil then
+                    layout.row.nextX = options.x + math.max(0, owner.contentWidth + options.width) +
+                        (options.columnGap or layout.columnGap)
+                end
+            end
         else
             options.width = width
         end
     end
     if options.height == nil then options.height = height end
 
+    if options._flowBreakAfter and not absolute then finalizeRow(layout) end
     growContent(owner, options.y + height)
     return options
 end
@@ -132,8 +141,12 @@ local function componentRoot(component)
     return component and (component.root or component) or nil
 end
 
-local function setFlowPosition(root, placement, x, y)
+local function setFlowPosition(owner, root, placement, x, y)
     root:SetPos(x, y, placement.xAnchor or 0, placement.yAnchor or 0)
+    if placement._flowFillWidth then
+        root:SetWidth(-(x + owner._flowLayout.paddingRight), placement.widthAnchor)
+    end
+    return placement._flowWidth or root.width or placement.width or placement.size or 0
 end
 
 local function reflow(owner)
@@ -149,7 +162,6 @@ local function reflow(owner)
         local placement = entry.placement
         if root ~= nil then
             local height = root.height or placement.height or 0
-            local width = root.width or placement.width or placement.size or 0
             local gap = placement._flowGap or layout.rowGap
 
             if placement._flowAbsolute == true then
@@ -157,7 +169,7 @@ local function reflow(owner)
             elseif placement.inline == true and layout.row ~= nil then
                 local x = placement._flowExplicitX and placement.x or layout.row.nextX
                 local y = layout.row.y + (placement.offsetY or 0)
-                setFlowPosition(root, placement, x, y)
+                local width = setFlowPosition(owner, root, placement, x, y)
                 layout.row.height = math.max(layout.row.height, (placement.offsetY or 0) + height)
                 layout.row.gap = math.max(layout.row.gap, gap)
                 layout.row.nextX = x + math.max(0, width) +
@@ -168,7 +180,7 @@ local function reflow(owner)
                 local marginTop = placement._flowMarginTop or 0
                 local x = placement._flowExplicitX and placement.x or layout.paddingLeft
                 local y = layout.nextY + marginTop
-                setFlowPosition(root, placement, x, y)
+                local width = setFlowPosition(owner, root, placement, x, y)
                 layout.row = {
                     y = y,
                     height = height,
@@ -178,6 +190,9 @@ local function reflow(owner)
                 }
                 layout.hasItems = true
                 contentBottom = math.max(contentBottom, y + height)
+            end
+            if placement._flowBreakAfter and placement._flowAbsolute ~= true then
+                finalizeRow(layout)
             end
         end
     end
