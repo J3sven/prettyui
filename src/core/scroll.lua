@@ -10,6 +10,7 @@ local ARROW_SIZE = 16
 local END_SIZE = 5
 local MIN_THUMB_HEIGHT = 24
 local DEFAULT_CHILD_TOP_OFFSET = 12
+local scrollByContent = {}
 
 local function clamp(value, minimum, maximum)
     return math.max(minimum, math.min(maximum, value))
@@ -24,6 +25,27 @@ local function topRelativeTo(root, ancestor)
     end
     if current ~= ancestor then return nil end
     return top
+end
+
+local function inputIsClipped(controller, root)
+    local top = topRelativeTo(root, controller.content)
+    if top == nil then return false end
+    local height = root.height or 0
+    while controller do
+        top = top - controller.scrollY
+        if (controller.isVisible and not controller.isVisible()) or
+            top < 0 or top + height > controller.height then
+            return true
+        end
+        local parent = controller.parentScroll
+        if parent then
+            local offset = topRelativeTo(controller.content, parent.content)
+            if offset == nil then return false end
+            top = top + offset
+        end
+        controller = parent
+    end
+    return false
 end
 
 local function sprite(parent, spriteID)
@@ -63,6 +85,7 @@ function Scroll.new(parent, options)
     self.onLayout = options.onLayout
     self.clickthrough = options.clickthrough == true
     self.clipTargets = {}
+    self.childScrolls = {}
 
     self.root = ui.Layer.new(parent)
     self.root:SetPos(
@@ -86,6 +109,20 @@ function Scroll.new(parent, options)
     self.content = ui.Layer.new(self.viewport)
     self.content.clickthrough = self.clickthrough
     self.content.enabled = not self.clickthrough
+
+    -- Follow native ancestry, not tooltip/overlay ancestry: popout surfaces have
+    -- independent viewports even when they share a logical content owner.
+    local ancestor = parent
+    while ancestor do
+        local controller = scrollByContent[ancestor]
+        if controller then
+            self.parentScroll = controller
+            controller.childScrolls[self] = true
+            break
+        end
+        ancestor = ancestor.parent
+    end
+    scrollByContent[self.content] = self
 
     self.upArrow = sprite(self.root, Sprites.SCROLL_ARROW_UP)
     self.upArrow.clickthrough = self.clickthrough
@@ -239,8 +276,8 @@ function Scroll.install(class)
     end
 end
 
--- Focused native input text is not clipped by a scrolled ancestor. Clip targets
--- therefore mirror viewport visibility when they are wholly outside its bounds.
+-- Native input text can escape ancestor clipping. Only show a field when its
+-- full height is inside every containing viewport, including tab page bounds.
 function Scroll:RegisterClipTarget(target)
     if target == nil or target.root == nil then return end
     local entry = {
@@ -270,10 +307,7 @@ function Scroll:_RefreshClipTargets()
         if root == nil then
             table.remove(self.clipTargets, index)
         else
-            local top = topRelativeTo(root, self.content)
-            local clipped = top ~= nil and
-                (top + (root.height or 0) <= self.scrollY or
-                    top >= self.scrollY + self.height)
+            local clipped = inputIsClipped(self, root)
             if clipped then
                 if not entry.hiddenByClip then
                     entry.hiddenBeforeClip = root.hidden == true
@@ -287,6 +321,7 @@ function Scroll:_RefreshClipTargets()
             end
         end
     end
+    for child in pairs(self.childScrolls) do child:_RefreshClipTargets() end
 end
 
 function Scroll:_ShouldShow()
@@ -450,6 +485,13 @@ end
 
 function Scroll:Destroy()
     self:_StopDrag()
+    scrollByContent[self.content] = nil
+    if self.parentScroll then
+        self.parentScroll.childScrolls[self] = nil
+        self.parentScroll = nil
+    end
+    for child in pairs(self.childScrolls) do child.parentScroll = nil end
+    self.childScrolls = {}
     if self.thumbDrag then
         if self.ownerWindow then self.ownerWindow:_UnregisterOverlay(self.thumbDrag) end
         self.thumbDrag:Destroy()
