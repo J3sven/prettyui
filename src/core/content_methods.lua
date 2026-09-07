@@ -16,6 +16,7 @@ local ContentMethods = {}
 --   measured       obtain default dimensions from the component's getSize function
 --   measureArgs    number of non-option arguments accepted by getSize, when it
 --                  differs from the constructor (ItemGrid is the current example)
+--   fitInline     use measured width instead of filling the row when inline
 --   flowOptions    normalize options with the component's flowOptions function
 --   bindFlow       bind a component whose height can alter its owner's flow layout
 --   proxyCallbacks replace the concrete panel child passed to callbacks with its proxy
@@ -76,6 +77,7 @@ local COMPONENTS = {
         optionsIndex = 2,
         measured = true,
         fillWidth = true,
+        fitInline = true,
         proxyCallbacks = { "onChange" },
     },
     {
@@ -84,6 +86,7 @@ local COMPONENTS = {
         optionsIndex = 2,
         measured = true,
         fillWidth = true,
+        fitInline = true,
         proxyCallbacks = { "onChange" },
     },
     { method = "AddColourPicker", module = "src/colour_picker", optionsIndex = 1, measured = true },
@@ -166,7 +169,7 @@ local function place(owner, component, spec, args, options)
     return Layout.place(owner, options, {
         width = width,
         height = height,
-        fillWidth = spec.fillWidth,
+        fillWidth = spec.fillWidth and not (spec.fitInline and options and options.inline == true),
     })
 end
 

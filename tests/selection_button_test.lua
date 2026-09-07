@@ -136,4 +136,43 @@ expect(radio.items[1].row.y, 0, "first inline radio starts on the row")
 expect(radio.items[2].row.y, 0, "second inline radio shares the row")
 expect(radio.items[2].row.x > radio.items[1].row.x, true, "inline radio choices advance horizontally")
 
+local Layout = require("src/core/layout")
+local Host = {}
+require("src/core/content_methods").installSingle(Host)
+
+for _, method in ipairs({ "AddCheckboxButton", "AddRadioButton" }) do
+    local content = component(nil, "content")
+    content.width = 800
+    local owner = setmetatable({ content = content, contentWidth = content.width }, { __index = Host })
+    Layout.configure(owner)
+    local function addSpacer(width, height)
+        local placed = Layout.place(owner, { width = width, height = height })
+        local root = component(content, "spacer")
+        root:SetPos(placed.x, placed.y)
+        root:SetSize(placed.width, placed.height)
+        return Layout.manage(owner, root, placed)
+    end
+    local prefix = addSpacer(1, 10)
+    local swatch = addSpacer(48, 48)
+    local controls = {}
+    for _, text in ipairs({ "Show tile marker", "Fill tile marker", "Mark entire NPC size" }) do
+        controls[#controls + 1] = owner[method](owner, { text }, { inline = true })
+    end
+    local function checkRow()
+        local previous = swatch
+        for _, control in ipairs(controls) do
+            expect(control.root.y, swatch.y, method .. " shares the colour swatch row")
+            expect(control.root.x, previous.x + previous.width + 8,
+                method .. " follows the previous control without overlap")
+            previous = control.root
+        end
+        expect(previous.x + previous.width <= content.width - 14, true,
+            method .. " leaves room for all three inline controls")
+    end
+    checkRow()
+    prefix:Destroy()
+    checkRow()
+    Layout.destroyManaged(owner)
+end
+
 print("selection_button_test: ok")
