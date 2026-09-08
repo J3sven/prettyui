@@ -31,6 +31,7 @@ local PrettyUI = {
     RadioButton = require("src/radio_button"),
     SimpleButton = require("src/simple_button"),
     Slider = require("src/slider"),
+    Sprite = require("src/sprite"),
     SpriteButton = require("src/sprite_button"),
     Spinner = require("src/spinner"),
     Tabs = require("src/tabs"),

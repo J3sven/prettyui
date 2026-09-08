@@ -23,6 +23,7 @@ local ContentMethods = {}
 local COMPONENTS = {
     { method = "AddText", textTitle = false },
     { method = "AddTitle", textTitle = true },
+    { method = "AddSprite", module = "src/sprite", optionsIndex = 2, measured = true, measureArgs = 0 },
     { method = "AddSpinner", module = "src/spinner", optionsIndex = 1, width = 29, height = 29 },
     { method = "AddBigSpinner", module = "src/big_spinner", optionsIndex = 1, width = 72, height = 72 },
     { method = "AddTimeGraph", module = "src/time_graph", optionsIndex = 1, measured = true, fillWidth = true },

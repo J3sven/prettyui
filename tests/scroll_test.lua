@@ -4,6 +4,19 @@ local function expect(actual, expected, message)
     end
 end
 
+local function expectInputClipped(field, clipped, message)
+    local root = field.root
+    expect((root.text.rgba & 0xFF) == 0, clipped, message)
+    expect(root.hidden, false, message .. ": field frame remains visible")
+    if clipped then
+        expect(root.text.isShadowed, false, message .. ": no text shadow escapes")
+        expect(root.emptyTextRGBA & 0xFF, 0, message .. ": no placeholder escapes")
+        expect(root.caretRGBA & 0xFF, 0, message .. ": no caret escapes")
+        expect(root.errorCaretRGBA & 0xFF, 0, message .. ": no error caret escapes")
+        expect(root.selectionHighlightRGBA & 0xFF, 0, message .. ": no selection escapes")
+    end
+end
+
 local rawMousePosition
 Mouse = {
     GetPosition = function()
@@ -240,11 +253,11 @@ expect(#window._managedFlowEntries, 4, "destroyed text leaves the flow registry"
 local replacement = window:AddText({ text = "Replacement", height = 30 })
 expect(replacement.y, rows[5].y + rows[5].height + 2, "new text follows the reflowed rows")
 local clippedField = window:AddTextField({ text = "Viewport clipping regression" })
-expect(clippedField.root.hidden, true, "text fields below the viewport are hidden")
+expectInputClipped(clippedField, true, "text below the viewport is transparent")
 window:ScrollToChild(clippedField, 0)
-expect(clippedField.root.hidden, false, "text fields are restored when scrolled into view")
+expectInputClipped(clippedField, false, "text is restored when scrolled into view")
 window:SetScrollPosition(0)
-expect(clippedField.root.hidden, true, "text fields are hidden again after leaving the viewport")
+expectInputClipped(clippedField, true, "text is transparent again after leaving the viewport")
 window:SetScrollPosition(10)
 expect(window.scrollY, 10, "installed host methods keep public scroll state synchronized")
 window:ScrollToChild(rows[4], 4)
@@ -382,28 +395,31 @@ local clippingPage = clippingTabs:GetPage(1)
 local inputChanges = 0
 local tabField = clippingPage:AddTextField({
     text = "26773, 31635", y = 40, width = 120,
+    colour = 0x12345680, placeholderColour = 0x23456760,
+    caretColour = 0x34567840, selectionColour = 0x45678920,
     onChange = function() inputChanges = inputChanges + 1 end,
 })
+tabField.root.errorCaretRGBA = 0x56789A80
 clippingPage:SetContentHeight(1000)
 clippingPage:SetScrollPosition(tabField.root.y)
-expect(tabField.root.hidden, false, "input touching the tab divider remains visible")
+expectInputClipped(tabField, false, "input touching the tab divider retains its text")
 clippingPage:ScrollBy(1)
-expect(tabField.root.hidden, true, "partially clipped input cannot draw over the tab divider")
+expectInputClipped(tabField, true, "partially clipped input text cannot draw over the tab divider")
 clippingPage:SetScrollPosition(tabField.root.y + tabField.root.height)
-expect(tabField.root.hidden, true, "input wholly above the tab page stays hidden")
+expectInputClipped(tabField, true, "input text wholly above the tab page stays transparent")
 clippingPage:SetScrollPosition(0)
-expect(tabField.root.hidden, false, "input returns when fully inside the tab page")
+expectInputClipped(tabField, false, "input text returns when fully inside the tab page")
 tabField.root:SetPos(14, clippingPage._scroll.height - tabField.root.height + 1)
 clippingPage:SetScrollPosition(0)
-expect(tabField.root.hidden, true, "input crossing the lower tab page edge is hidden")
+expectInputClipped(tabField, true, "input text crossing the lower tab page edge is transparent")
 clippingPage:ScrollBy(1)
-expect(tabField.root.hidden, false, "input exactly inside the lower edge is restored")
+expectInputClipped(tabField, false, "input text exactly inside the lower edge is restored")
 tabField.root:SetPos(14, 40)
 clippingPage:SetScrollPosition(0)
 clippingTabs:SetActive(2)
-expect(tabField.root.hidden, true, "inactive tab input is explicitly hidden")
+expectInputClipped(tabField, true, "inactive tab input text is transparent")
 clippingTabs:SetActive(1)
-expect(tabField.root.hidden, false, "reactivating the tab restores its input")
+expectInputClipped(tabField, false, "reactivating the tab restores its input text")
 tabField.root.hidden = true
 clippingPage:SetScrollPosition(41)
 clippingPage:SetScrollPosition(0)
@@ -416,27 +432,33 @@ local nestedField = nestedPage:AddTextField({ text = "Nested input", y = 20, wid
 nestedPage:SetContentHeight(500)
 local nestedTop = nestedTabs.root.y + nestedTabs.content.y + nestedField.root.y
 clippingPage:SetScrollPosition(nestedTop)
-expect(nestedField.root.hidden, false, "nested input at its parent viewport edge is visible")
+expectInputClipped(nestedField, false, "nested input text at its parent viewport edge is visible")
 clippingPage:ScrollBy(1)
-expect(nestedField.root.hidden, true, "parent scrolling clips nested tab inputs")
+expectInputClipped(nestedField, true, "parent scrolling clips nested tab input text")
 nestedPage:SetScrollPosition(0)
-expect(nestedField.root.hidden, true, "child refresh cannot undo parent clipping")
+expectInputClipped(nestedField, true, "child refresh cannot undo parent text clipping")
 clippingPage:SetScrollPosition(0)
-expect(nestedField.root.hidden, false, "parent scrolling back restores nested input")
+expectInputClipped(nestedField, false, "parent scrolling back restores nested input text")
 nestedPage:SetScrollPosition(nestedField.root.y + 1)
 clippingPage:SetScrollPosition(10)
-expect(nestedField.root.hidden, true, "parent refresh cannot undo child clipping")
+expectInputClipped(nestedField, true, "parent refresh cannot undo child text clipping")
 nestedPage:SetScrollPosition(0)
-expect(nestedField.root.hidden, false, "nested input restores only when all viewports allow it")
+expectInputClipped(nestedField, false, "nested input text restores only when all viewports allow it")
 clippingPage:SetScrollPosition(0)
 clippingWindow:SetContentHeight(1000)
 local windowTop = clippingTabs.root.y + clippingTabs.content.y + nestedTop
 clippingWindow:SetScrollPosition(windowTop + 1)
-expect(nestedField.root.hidden, true, "window scrolling updates deeply nested tab input clipping")
+expectInputClipped(nestedField, true, "window scrolling updates deeply nested tab input text clipping")
 clippingWindow:SetScrollPosition(0)
-expect(nestedField.root.hidden, false, "deeply nested input returns after window scrolling")
+expectInputClipped(nestedField, false, "deeply nested input text returns after window scrolling")
 expect(tabField:GetText(), "26773, 31635", "clipping preserves input contents")
 expect(inputChanges, 0, "clipping does not emit input changes")
+expect(tabField.root.text.rgba, 0x12345680, "clipping restores custom text colour and alpha")
+expect(tabField.root.text.isShadowed, true, "clipping restores the text shadow")
+expect(tabField.root.emptyTextRGBA, 0x23456760, "clipping restores placeholder colour")
+expect(tabField.root.caretRGBA, 0x34567840, "clipping restores caret colour")
+expect(tabField.root.errorCaretRGBA, 0x56789A80, "clipping restores error caret colour")
+expect(tabField.root.selectionHighlightRGBA, 0x45678920, "clipping restores selection colour")
 clippingWindow:Destroy()
 
 -- Exercise real paired content methods on two independent scroll/layout owners.

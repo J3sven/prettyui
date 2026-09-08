@@ -276,25 +276,18 @@ function Scroll.install(class)
     end
 end
 
--- Native input text can escape ancestor clipping. Only show a field when its
--- full height is inside every containing viewport, including tab page bounds.
+-- Native input text can escape ancestor clipping. Suppress only its content
+-- visuals at viewport boundaries; the field frame retains normal native clipping.
 function Scroll:RegisterClipTarget(target)
     if target == nil or target.root == nil then return end
-    local entry = {
-        target = target,
-        hiddenByClip = false,
-    }
-    table.insert(self.clipTargets, entry)
+    table.insert(self.clipTargets, target)
     self:_RefreshClipTargets()
 end
 
 function Scroll:UnregisterClipTarget(target)
     for index = #self.clipTargets, 1, -1 do
-        local entry = self.clipTargets[index]
-        if entry.target == target then
-            if entry.hiddenByClip and target.root then
-                target.root.hidden = entry.hiddenBeforeClip == true
-            end
+        if self.clipTargets[index] == target then
+            target:_SetContentClipped(false)
             table.remove(self.clipTargets, index)
         end
     end
@@ -302,23 +295,12 @@ end
 
 function Scroll:_RefreshClipTargets()
     for index = #self.clipTargets, 1, -1 do
-        local entry = self.clipTargets[index]
-        local root = entry.target and entry.target.root or nil
+        local target = self.clipTargets[index]
+        local root = target.root
         if root == nil then
             table.remove(self.clipTargets, index)
         else
-            local clipped = inputIsClipped(self, root)
-            if clipped then
-                if not entry.hiddenByClip then
-                    entry.hiddenBeforeClip = root.hidden == true
-                    entry.hiddenByClip = true
-                end
-                root.hidden = true
-            elseif entry.hiddenByClip then
-                root.hidden = entry.hiddenBeforeClip == true
-                entry.hiddenBeforeClip = nil
-                entry.hiddenByClip = false
-            end
+            target:_SetContentClipped(inputIsClipped(self, root))
         end
     end
     for child in pairs(self.childScrolls) do child:_RefreshClipTargets() end

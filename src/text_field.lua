@@ -109,6 +109,37 @@ function TextField:SetDisabled(disabled)
     end
 end
 
+function TextField:_SetContentClipped(clipped)
+    local root = self.root
+    if root == nil then return end
+    local appearance = self._unclippedAppearance
+    if clipped then
+        if appearance then return end
+        self._unclippedAppearance = {
+            textRGBA = root.text.rgba,
+            isShadowed = root.text.isShadowed,
+            emptyTextRGBA = root.emptyTextRGBA,
+            caretRGBA = root.caretRGBA,
+            errorCaretRGBA = root.errorCaretRGBA,
+            selectionHighlightRGBA = root.selectionHighlightRGBA,
+        }
+        root.text.rgba = 0
+        root.text.isShadowed = false
+        root.emptyTextRGBA = 0
+        root.caretRGBA = 0
+        root.errorCaretRGBA = 0
+        root.selectionHighlightRGBA = 0
+    elseif appearance then
+        root.text.rgba = appearance.textRGBA
+        root.text.isShadowed = appearance.isShadowed
+        root.emptyTextRGBA = appearance.emptyTextRGBA
+        root.caretRGBA = appearance.caretRGBA
+        root.errorCaretRGBA = appearance.errorCaretRGBA
+        root.selectionHighlightRGBA = appearance.selectionHighlightRGBA
+        self._unclippedAppearance = nil
+    end
+end
+
 function TextField:SetTooltip(value)
     return Tooltip.set(self, value)
 end
