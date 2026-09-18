@@ -111,7 +111,8 @@ end
 local function moveContextTooltipsToFront(context)
     if context == nil or not context.active then return end
     for _, tooltip in ipairs(context.tooltips) do
-        if tooltip.root ~= nil and tooltip.root.hidden ~= true then
+        if tooltip.root ~= nil and ui.Interfaces:GetInterface(tooltip.interfaceID) ~= nil
+            and tooltip.root.hidden ~= true then
             tooltip.root:MoveToFront()
         end
     end
@@ -140,6 +141,8 @@ function Tooltip.bind(owner, target, parent, value, field)
     local binding = {
         target = target,
         parent = parent,
+        targetInterfaceID = target.interfaceID,
+        parentInterfaceID = parent.interfaceID,
         active = true,
     }
     owner._tooltipBindings[field] = binding
@@ -152,6 +155,8 @@ function Tooltip.set(owner, value, field)
     local bindings = owner and owner._tooltipBindings
     local binding = bindings and bindings[field]
     if binding == nil or not binding.active then return false end
+    if ui.Interfaces:GetInterface(binding.targetInterfaceID) == nil
+        or ui.Interfaces:GetInterface(binding.parentInterfaceID) == nil then return false end
 
     local attachment = owner[field]
     if attachment ~= nil and value ~= nil and type(value) ~= "table" then
@@ -185,12 +190,14 @@ function Tooltip.attach(target, parent, value, hoverHandlers)
 
     local self = setmetatable({}, Tooltip)
     self.target = target
+    self.targetInterfaceID = target.interfaceID
     self.targetClickthrough = target.clickthrough
     self.options = options
     self.width = width
     self.height = height
     self.context = options.parent == nil and contexts[parent] or nil
     self.parent = options.parent or (self.context and self.context.parent) or parent
+    self.interfaceID = self.parent.interfaceID
 
     self.root = ui.Layer.new(self.parent)
     self.root:SetSize(width, height)
@@ -273,6 +280,9 @@ function Tooltip.attach(target, parent, value, hoverHandlers)
 end
 
 function Tooltip:Show()
+    if self.root == nil or self.target == nil
+        or ui.Interfaces:GetInterface(self.interfaceID) == nil
+        or ui.Interfaces:GetInterface(self.targetInterfaceID) == nil then return end
     local targetX = self.target.x or 0
     local targetY = self.target.y or 0
     if self.context and self.context.active then
@@ -308,7 +318,8 @@ function Tooltip:Show()
 end
 
 function Tooltip:SetText(text)
-    if self.root == nil or self.label == nil then return false end
+    if self.root == nil or self.label == nil
+        or ui.Interfaces:GetInterface(self.interfaceID) == nil then return false end
 
     text = tostring(text or "")
     self.options.text = text
@@ -321,18 +332,20 @@ function Tooltip:SetText(text)
 end
 
 function Tooltip:Hide()
-    if self.root then self.root.hidden = true end
+    if self.root ~= nil and ui.Interfaces:GetInterface(self.interfaceID) ~= nil then
+        self.root.hidden = true
+    end
 end
 
 function Tooltip:Destroy()
-    if self.target then
+    if self.target ~= nil and ui.Interfaces:GetInterface(self.targetInterfaceID) ~= nil then
         self.target:Unsubscribe(ui.Hook.ONMOUSEOVER, HOOK_ID)
         self.target:Unsubscribe(ui.Hook.ONMOUSELEAVE, HOOK_ID)
         self.target.clickthrough = self.targetClickthrough
-        self.target = nil
     end
+    self.target = nil
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
     self.parent = nil

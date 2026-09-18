@@ -88,6 +88,7 @@ function Renderer.init(self, parent, options)
     self.bars, self.edges = {}, {}
     self.dirty = true
     self.root = ui.Layer.new(parent)
+    self.interfaceID = self.root.interfaceID
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
     self.root:SetSize(width, height, self.widthAnchor, self.heightAnchor)
     self.root.hidden = options.visible == false
@@ -153,7 +154,9 @@ end
 
 function Renderer:_ClearHover()
     self.hoverX, self.hoverY = nil, nil
-    if self.highlight then self.highlight.hidden = true end
+    if self.highlight and ui.Interfaces:GetInterface(self.interfaceID) ~= nil then
+        self.highlight.hidden = true
+    end
     if self.tooltip then self.tooltip:Hide() end
 end
 
@@ -369,11 +372,14 @@ function Renderer:Destroy()
     Event.Logic.Unsubscribe(self.eventID)
     self:_ClearHover()
     Tooltip.unregisterContext(self.root)
-    self.plot:Unsubscribe(ui.Hook.ONMOUSEOVER, HOVER_HOOK)
-    self.plot:Unsubscribe(ui.Hook.ONMOUSEREPEAT, HOVER_HOOK)
-    self.plot:Unsubscribe(ui.Hook.ONMOUSELEAVE, HOVER_HOOK)
+    local loaded = ui.Interfaces:GetInterface(self.interfaceID) ~= nil
+    if self.plot and loaded then
+        self.plot:Unsubscribe(ui.Hook.ONMOUSEOVER, HOVER_HOOK)
+        self.plot:Unsubscribe(ui.Hook.ONMOUSEREPEAT, HOVER_HOOK)
+        self.plot:Unsubscribe(ui.Hook.ONMOUSELEAVE, HOVER_HOOK)
+    end
     instances[self] = nil
-    self.root:Destroy()
+    if loaded then self.root:Destroy() end
     self.root, self.body, self.plot = nil, nil, nil
     self.background, self.border, self.title, self.plotBackground = nil, nil, nil, nil
     self.grid, self.baseline, self.highlight, self.empty = nil, nil, nil, nil

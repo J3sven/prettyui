@@ -66,6 +66,7 @@ function Slider.new(parent, options)
     self.hoverCursor = options.hoverCursor or config.Cursor.CURSOR_BLANK
     self.dragStart = nil
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
     self.root:SetSize(options.width or requestedWidth, HEIGHT, options.widthAnchor or 0)
@@ -280,8 +281,10 @@ function Slider:_StopDrag()
     self.dragStart = nil
     self.thumbPressed = false
     self.thumbHovered = false
-    self:_LayoutThumbDrag()
-    self:_UpdateState()
+    if self.root and self.thumbDrag and ui.Interfaces:GetInterface(self.interfaceID) ~= nil then
+        self:_LayoutThumbDrag()
+        self:_UpdateState()
+    end
     return false
 end
 
@@ -320,12 +323,13 @@ end
 function Slider:Destroy()
     self:_StopDrag()
     Tooltip.unbind(self)
+    local loaded = ui.Interfaces:GetInterface(self.interfaceID) ~= nil
     if self.thumbDrag then
-        self.thumbDrag:Destroy()
+        if loaded then self.thumbDrag:Destroy() end
         self.thumbDrag = nil
     end
     if self.root then
-        self.root:Destroy()
+        if loaded then self.root:Destroy() end
         self.root = nil
     end
     self.parent = nil

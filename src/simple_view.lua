@@ -56,11 +56,11 @@ function SimpleView:SetTooltip(value)
 end
 
 function SimpleView:Destroy()
-    Layout.destroyManaged(self)
     if self.content then
         Tooltip.unregisterContext(self.content)
         self.tooltipContext = nil
     end
+    Layout.destroyManaged(self)
     Tooltip.unbind(self)
     Scroll.Destroy(self)
 end

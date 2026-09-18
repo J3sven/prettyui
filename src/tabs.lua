@@ -358,6 +358,7 @@ function Tabs.new(parent, values, options)
     self.tabInset = math.max(0, math.floor(options.tabInset or 0))
 
     self.root = ui.Layer.new(parent)
+    self.interfaceID = self.root.interfaceID
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
     self.root:SetSize(width, rootHeight, options.widthAnchor or 0, heightAnchor)
     self.root.clickthrough = true
@@ -470,7 +471,7 @@ function Tabs:SetScrollable(scrollable)
 end
 
 function TabPage:RefreshRowBackgrounds()
-    RowBackgrounds.clear(self.rowBackgrounds)
+    RowBackgrounds.clear(self.rowBackgrounds, self.interfaceID)
     self.rowBackgrounds = RowBackgrounds.apply(
         self.content,
         self._scroll.height,
@@ -483,7 +484,7 @@ function Tabs:Destroy()
     if self.root then Tooltip.unregisterContext(self.root) end
     for _, tab in ipairs(self.tabs) do Tooltip.unbind(tab, "tooltipAttachment") end
     for _, page in ipairs(self.pages) do
-        RowBackgrounds.clear(page.rowBackgrounds)
+        RowBackgrounds.clear(page.rowBackgrounds, page.interfaceID)
         page.rowBackgrounds = {}
         if page.content then Tooltip.unregisterContext(page.content) end
         Layout.destroyManaged(page)
@@ -492,7 +493,10 @@ function Tabs:Destroy()
     self.pages = {}
     self.tabs = {}
     Tooltip.unbind(self)
-    if self.root then self.root:Destroy() self.root = nil end
+    if self.root then
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
+        self.root = nil
+    end
 end
 
 -- A page is a normal single-surface content host, including nested panels and tabs.

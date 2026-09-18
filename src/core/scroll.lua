@@ -80,6 +80,7 @@ function Scroll.new(parent, options)
     self.parentWheelHandler = options._onScrollWheel
     self.ownerWindow = options.ownerWindow or findOwnerWindow(options.parentContext)
     self.overlayParent = options.overlayParent or parent
+    self.overlayInterfaceID = self.overlayParent.interfaceID
     self.position = options.position
     self.isVisible = options.isVisible
     self.onLayout = options.onLayout
@@ -88,6 +89,7 @@ function Scroll.new(parent, options)
     self.childScrolls = {}
 
     self.root = ui.Layer.new(parent)
+    self.interfaceID = self.root.interfaceID
     self.root:SetPos(
         options.x or 0,
         options.y or 0,
@@ -287,7 +289,9 @@ end
 function Scroll:UnregisterClipTarget(target)
     for index = #self.clipTargets, 1, -1 do
         if self.clipTargets[index] == target then
-            target:_SetContentClipped(false)
+            if target.root and ui.Interfaces:GetInterface(target.interfaceID) ~= nil then
+                target:_SetContentClipped(false)
+            end
             table.remove(self.clipTargets, index)
         end
     end
@@ -317,7 +321,9 @@ function Scroll:_AbsolutePosition()
 end
 
 function Scroll:_LayoutThumbDrag()
-    if self.thumbDrag == nil or self.root == nil then return end
+    if self.thumbDrag == nil or self.root == nil or self.track == nil or self.thumb == nil or
+        ui.Interfaces:GetInterface(self.interfaceID) == nil or
+        ui.Interfaces:GetInterface(self.overlayInterfaceID) == nil then return end
     -- The first ONHOLD expands this layer across the overlay parent so later
     -- events continue outside the scrollbar. Window overlay synchronization can
     -- run during SetScrollPosition; do not collapse the active capture back onto
@@ -476,11 +482,11 @@ function Scroll:Destroy()
     self.childScrolls = {}
     if self.thumbDrag then
         if self.ownerWindow then self.ownerWindow:_UnregisterOverlay(self.thumbDrag) end
-        self.thumbDrag:Destroy()
+        if ui.Interfaces:GetInterface(self.overlayInterfaceID) ~= nil then self.thumbDrag:Destroy() end
         self.thumbDrag = nil
     end
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
     self.clipTargets = {}

@@ -39,6 +39,7 @@ function Window.new(parent, options)
 
     local self = setmetatable({}, Window)
     self.parent = parent
+    self.interfaceID = parent.interfaceID
     self.title = options.title
     self.onClose = options.onClose
     self.destroyOnClose = options.destroyOnClose == true
@@ -285,7 +286,7 @@ function Window:SetTooltip(value)
 end
 
 function Window:RefreshRowBackgrounds()
-    RowBackgrounds.clear(self.rowBackgrounds)
+    RowBackgrounds.clear(self.rowBackgrounds, self.interfaceID)
     self.rowBackgrounds = RowBackgrounds.apply(
         self.content,
         self._scroll.height,
@@ -300,7 +301,11 @@ ContentMethods.installSingle(Window)
 Scroll.install(Window)
 
 function Window:_RegisterOverlay(component, isVisible, layout)
-    self.overlays[component] = { isVisible = isVisible, layout = layout }
+    self.overlays[component] = {
+        interfaceID = component.interfaceID,
+        isVisible = isVisible,
+        layout = layout,
+    }
 end
 
 function Window:_UnregisterOverlay(component)
@@ -308,15 +313,19 @@ function Window:_UnregisterOverlay(component)
 end
 
 function Window:_SyncOverlays(hidden)
+    if self.root == nil or ui.Interfaces:GetInterface(self.interfaceID) == nil then return end
     for component, overlay in pairs(self.overlays) do
-        if not hidden and overlay.layout then overlay.layout() end
-        component.hidden = hidden or
-            (overlay.isVisible and not overlay.isVisible() or false)
-        if not component.hidden then component:MoveToFront() end
+        if ui.Interfaces:GetInterface(overlay.interfaceID) ~= nil then
+            if not hidden and overlay.layout then overlay.layout() end
+            component.hidden = hidden or
+                (overlay.isVisible and not overlay.isVisible() or false)
+            if not component.hidden then component:MoveToFront() end
+        end
     end
 end
 
 function Window:Show()
+    if self.root == nil or ui.Interfaces:GetInterface(self.interfaceID) == nil then return end
     self.root.hidden = false
     self.root:MoveToFront()
     if self.titleDrag then
@@ -331,7 +340,7 @@ function Window:Close()
     if self.onClose then self.onClose(self) end
     if self.destroyOnClose then
         self:Destroy()
-    else
+    elseif self.root ~= nil and ui.Interfaces:GetInterface(self.interfaceID) ~= nil then
         self.root.hidden = true
         if self.titleDrag then self.titleDrag.hidden = true end
         self:_SyncOverlays(true)
@@ -340,13 +349,13 @@ end
 
 function Window:Destroy()
     self:_SyncOverlays(true)
-    RowBackgrounds.clear(self.rowBackgrounds)
+    RowBackgrounds.clear(self.rowBackgrounds, self.interfaceID)
     self.rowBackgrounds = {}
-    Layout.destroyManaged(self)
     if self.content then
         Tooltip.unregisterContext(self.content)
         self.tooltipContext = nil
     end
+    Layout.destroyManaged(self)
     Tooltip.unbind(self)
     if self._scroll then
         self._scroll:Destroy()
@@ -355,11 +364,12 @@ function Window:Destroy()
         self.content = nil
     end
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
     if self.titleDrag then
-        self.titleDrag:Destroy()
+        InterfaceMouse.EndCapture(self.titleDrag)
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.titleDrag:Destroy() end
         self.titleDrag = nil
     end
     self.overlays = {}

@@ -126,6 +126,7 @@ function TimeGraph.new(parent, options)
     self.xLabels = {}
     self.dirty = true
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
     self.root:SetSize(width, height, self.widthAnchor, self.heightAnchor)
@@ -450,7 +451,7 @@ function TimeGraph:Destroy()
     Tooltip.unbind(self)
     Tooltip.unregisterContext(self.root)
     instances[self] = nil
-    self.root:Destroy()
+    if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
     self.root = nil
     self.listener = nil
     self.hoverSlot = nil

@@ -23,6 +23,7 @@ function BigSpinner.new(parent, options)
     self.rotation = rotation(options.rotation)
     self.running = false
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(
         options.x or 0,
@@ -85,7 +86,7 @@ function BigSpinner:Destroy()
     self:Stop()
     Tooltip.unbind(self)
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
         self.backdrop = nil
         self.rotating = nil

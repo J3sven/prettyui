@@ -95,7 +95,9 @@ function ItemSlot:_ShowDragItem()
 end
 
 function ItemSlot:_HideDragItem()
-    if self.dragItem then self.dragItem.hidden = true end
+    if self.dragItem and ui.Interfaces:GetInterface(self.interfaceID) ~= nil then
+        self.dragItem.hidden = true
+    end
 end
 
 function ItemSlot:_UpdateTooltip()
@@ -124,6 +126,7 @@ function ItemSlot.new(parent, object, options)
     self.backgroundSpriteID = options.backgroundSpriteID or Sprites.ITEM_SLOT_BACKGROUND
     self.onObjectChange = options.onObjectChange
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(
         options.x or 0,
@@ -187,7 +190,7 @@ function ItemSlot:Destroy()
         self.tooltip = nil
     end
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
         self.background = nil
         self.item = nil

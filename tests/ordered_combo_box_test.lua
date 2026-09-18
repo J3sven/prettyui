@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     if actual ~= expected then
         error(message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
@@ -18,7 +20,7 @@ local function component()
     function result:Subscribe(hook, callback) self.hooks[hook] = callback end
     function result:MoveToFront() self.movedToFront = true end
     function result:Destroy() self.destroyed = true end
-    return result
+    return Interfaces.component(result)
 end
 
 ui = {

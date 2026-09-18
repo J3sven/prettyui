@@ -81,6 +81,7 @@ function CollapseButton.new(parent, text, options)
     self.indent = options.indent or DEFAULT_INDENT
     self.contentHeight = 0
     self.children = {}
+    self.labels = {}
     self.equalizedButtons = {}
     self.onToggle = options.onToggle
     self._onScrollWheel = options._onScrollWheel
@@ -89,6 +90,7 @@ function CollapseButton.new(parent, text, options)
     self.textColour = options.colour or TEXT_COLOUR
     self.disabledTextColour = options.disabledColour or DISABLED_TEXT_COLOUR
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
     self.root:SetSize(width, SEGMENT_SIZE, options.widthAnchor or 0, 0)
@@ -306,7 +308,7 @@ function CollapseButton:AddText(value)
     options.width = options.width or 0
     options.widthAnchor = options.widthAnchor == nil and 1.0 or options.widthAnchor
     local label = Text.new(self.content, options)
-    table.insert(self.children, label)
+    table.insert(self.labels, label)
     self:_SetContentHeight(math.max(self.contentHeight, options.y + options.height))
     return label
 end
@@ -370,19 +372,29 @@ function CollapseButton:_UpdateState()
 end
 
 function CollapseButton:Destroy()
+    local loaded = ui.Interfaces:GetInterface(self.interfaceID) ~= nil
     if self.content then
         Tooltip.unregisterContext(self.content)
         self.contentTooltipContext = nil
     end
     for index = #self.children, 1, -1 do
         local child = self.children[index]
-        if child and child.Destroy then child:Destroy() end
+        if child then
+            child:Destroy()
+        end
     end
     self.children = {}
+    if loaded then
+        for index = #self.labels, 1, -1 do
+            local label = self.labels[index]
+            if label then label:Destroy() end
+        end
+    end
+    self.labels = {}
     self.equalizedButtons = {}
     Tooltip.unbind(self)
     if self.root then
-        self.root:Destroy()
+        if loaded then self.root:Destroy() end
         self.root = nil
         self.content = nil
     end

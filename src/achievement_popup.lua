@@ -100,6 +100,7 @@ function AchievementPopup.new(parent, options)
     local width = math.max(BORDER_SIZE * 2 + 1, options.width or DEFAULT_WIDTH)
     local height = math.max(BORDER_SIZE * 2 + 1, options.height or DEFAULT_HEIGHT)
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(
         options.x or -math.floor(width / 2),
@@ -229,7 +230,7 @@ function AchievementPopup:Destroy()
         self.itemSlot = nil
     end
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
     self.sound = nil

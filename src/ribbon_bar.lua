@@ -21,6 +21,7 @@ local entries = {}
 local entriesByID = {}
 local gameArea = nil
 local root = nil
+local interfaceID = nil
 local frame = nil
 local settingsButton = nil
 local settingsWindow = nil
@@ -147,7 +148,7 @@ local function updateSlide(width, height)
 end
 
 local function layoutRoot()
-    if root == nil then return end
+    if root == nil or ui.Interfaces:GetInterface(interfaceID) == nil then return end
     local width, height = barSize()
     if position == "top" then
         root:SetPos(-math.floor(width / 2), -slideOffset, 0.5, 0)
@@ -254,7 +255,7 @@ local function createEntryButton(entry)
 end
 
 local function rebuildButtons()
-    if root == nil then return end
+    if root == nil or ui.Interfaces:GetInterface(interfaceID) == nil then return end
     destroyButtons()
     settingsButton = RibbonButton.new(
         root,
@@ -276,11 +277,12 @@ local function destroySurface()
     destroyButtons()
     if root ~= nil then
         Tooltip.unregisterContext(root)
-        root:Destroy()
+        if ui.Interfaces:GetInterface(interfaceID) ~= nil then root:Destroy() end
         root = nil
     end
     frame = nil
     gameArea = nil
+    interfaceID = nil
 end
 
 local function ensureMounted()
@@ -294,6 +296,7 @@ local function ensureMounted()
         gameArea = currentGameArea
     end
     if root == nil then
+        interfaceID = gameArea.interfaceID
         root = ui.Layer.new(gameArea)
         root.clickthrough = false
         Tooltip.registerContext(root, gameArea, function(target)
@@ -388,7 +391,7 @@ end
 function RibbonBar.SetPosition(value)
     position = normalizePosition(value)
     PersistentDB:SetString(POSITION_STORAGE_KEY, position)
-    if settingsPositionControl ~= nil then
+    if settingsPositionControl ~= nil and ui.Interfaces:GetInterface(interfaceID) ~= nil then
         settingsPositionControl:SetSelectedValue(position, false)
     end
     layoutRoot()
@@ -401,7 +404,7 @@ end
 function RibbonBar.SetAutoHide(value)
     autoHide = value == true
     PersistentDB:SetBool(AUTO_HIDE_STORAGE_KEY, autoHide)
-    if settingsAutoHideControl ~= nil then
+    if settingsAutoHideControl ~= nil and ui.Interfaces:GetInterface(interfaceID) ~= nil then
         settingsAutoHideControl:SetSelected("autoHide", autoHide, false)
     end
 end

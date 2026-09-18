@@ -17,6 +17,7 @@ function Sprite.new(parent, sprite, options)
     local self = setmetatable({}, Sprite)
     local width, height = Sprite.getSize(options)
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Sprite.new(parent)
     self.root:SetPos(
         options.x or 0,
@@ -45,7 +46,7 @@ end
 function Sprite:Destroy()
     Tooltip.unbind(self)
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
 end

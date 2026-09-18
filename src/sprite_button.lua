@@ -36,6 +36,7 @@ function SpriteButton.new(parent, spriteName, action, options)
     self.hasCustomHoverCursor = options.hoverCursor ~= nil
     self.hoverCursor = options.hoverCursor or defaultCursor(normalizedName)
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Sprite.new(parent)
     self.root:SetPos(
         options.x or 0,
@@ -121,7 +122,7 @@ end
 function SpriteButton:Destroy()
     Tooltip.unbind(self)
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
 end

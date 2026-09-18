@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     assert(actual == expected, message .. ': expected ' .. tostring(expected) .. ', got ' .. tostring(actual))
 end
@@ -23,11 +25,11 @@ local function factory(kind)
     return {new = function(parent)
         local component = {parent = parent, kind = kind, children = {}, hooks = {}, x = 0, y = 0, w = 0, h = 0, wa = 0, ha = 0}
         if parent then table.insert(parent.children, component) end
-        return setmetatable(component, {__index = function(self, key)
+        return Interfaces.component(setmetatable(component, {__index = function(self, key)
             if key == 'width' then return self.w + (self.parent and self.parent.width or 0) * self.wa end
             if key == 'height' then return self.h + (self.parent and self.parent.height or 0) * self.ha end
             return methods[key]
-        end})
+        end}), parent)
     end}
 end
 ui = {
@@ -142,8 +144,8 @@ end
 package.loaded['src/core/scroll'] = {install = function() end}
 local Panel = require('src/panel')
 local panel = setmetatable({dock = {content = root}, overlay = {content = root},
-    dockOwner = {contentHeight = 700, contentWidth = 800},
-    overlayOwner = {contentHeight = 700, contentWidth = 800}}, Panel)
+    dockOwner = {content = root, contentHeight = 700, contentWidth = 800},
+    overlayOwner = {content = root, contentHeight = 700, contentWidth = 800}}, Panel)
 local panelNotices = 0
 local paired = panel:AddTimeGraph({metric = {id = 'xp'}, capacity = 8, onZoom = function(handle)
     assert(handle.dock and handle.overlay, 'paired callback exposes panel proxy')

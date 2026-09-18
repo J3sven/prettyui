@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     if actual ~= expected then
         error(message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
@@ -18,7 +20,7 @@ local function component(parent)
     function value:MoveToBack() self.movedToBack = true end
     function value:Subscribe(hook, callback) self.subscriptions[hook] = callback end
     function value:Destroy() self.destroyed = true end
-    return value
+    return Interfaces.component(value, parent)
 end
 
 local created = {}
@@ -71,7 +73,7 @@ package.loaded["src/core/layout"] = {
     end,
     destroyManaged = function() end,
 }
-package.loaded["src/core/mouse"] = {}
+package.loaded["src/core/mouse"] = { EndCapture = function() end }
 package.loaded["src/core/scroll"] = {
     attach = function(owner, _, options)
         owner.viewport = component()

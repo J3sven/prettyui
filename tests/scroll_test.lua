@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     if actual ~= expected then
         error(message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
@@ -51,6 +53,9 @@ local function component(parent, kind)
     function result:SetWidth(width, widthAnchor)
         self.width = width + ((parent and parent.width or 0) * (widthAnchor or 0))
     end
+    function result:SetHeight(height, heightAnchor)
+        self.height = height + ((parent and parent.height or 0) * (heightAnchor or 0))
+    end
     function result:SetScrollSize(width, height)
         self.scrollWidth, self.scrollHeight = width, height
     end
@@ -58,16 +63,20 @@ local function component(parent, kind)
         self.scrollPositionUpdates = (self.scrollPositionUpdates or 0) + 1
         self.scrollX, self.scrollY = x, y
     end
-    function result:Subscribe(hook, callback)
-        self.subscriptions[hook] = callback
+    function result:Subscribe(hook, name, callback)
+        self.subscriptions[hook] = callback or name
+    end
+    function result:Unsubscribe(hook)
+        self.subscriptions[hook] = nil
     end
     function result:MoveToFront() end
+    function result:MoveToBack() end
     function result:Destroy() self.destroyed = true end
     if parent then
         parent.children = parent.children or {}
         table.insert(parent.children, result)
     end
-    return result
+    return Interfaces.component(result, parent)
 end
 
 local function factory(kind)
@@ -512,5 +521,51 @@ expect(field.dock.root.x + field.dock.root.width, dockView.content.width - 14,
     "removing the label expands the field to the remaining content width")
 dockView:Destroy()
 overlayView:Destroy()
+
+-- Logout arrives after native interfaces are gone. Retained handles deliberately
+-- reject every read/write so this exercises the unsafe path, not tolerant mocks.
+local callbacks = {}
+Event = { Logic = {
+    Subscribe = function(key, callback) callbacks[key] = callback end,
+    Unsubscribe = function(key) callbacks[key] = nil end,
+} }
+Keyboard = { IsAvailable = function() return false end }
+config.Cursor.CURSOR_OPEN = { id = 1 }
+package.loaded["src/core/sprites"].CONTENT_FRAME = {}
+package.loaded["src/core/sprites"].HUD_WINDOW = {}
+package.loaded["src/core/sprites"].SPRITE_BUTTONS = {
+    POPOUT = { neutral = 1 }, DOCK = { neutral = 1 },
+}
+local closed = 0
+local logoutWindow = Window.new(parent, {
+    title = "Logout", width = 400, height = 300,
+    rowBackgroundColours = { 0x24211EFF },
+    onClose = function() closed = closed + 1 end,
+})
+local logoutTabs = logoutWindow:AddTabs({ "Markers" }, { height = 200 })
+local logoutPage = logoutTabs:GetPage(1)
+logoutPage:AddText("Marker settings")
+logoutPage:AddTextField({ text = "Unsaved label" })
+local logoutPanel = logoutPage:AddPanel({ width = 250, height = 100 })
+logoutPanel:AddText("Preset")
+local logoutButton = logoutWindow:AddRibbonButton(1, function() end, { tooltip = "Markers" })
+logoutButton.tooltip:Show()
+logoutWindow._scroll.dragStart = { mouseY = 10 }
+Interfaces.unload()
+logoutButton:SetActive(false)
+logoutWindow:Close()
+logoutWindow:Destroy()
+logoutWindow:Destroy()
+expect(closed, 1, "logout close still invokes the plugin callback")
+expect(logoutWindow.root, nil, "logout releases the dead window")
+expect(next(callbacks), nil, "logout removes panel event subscriptions")
+
+local loginParent = component(nil, "parent")
+loginParent.width, loginParent.height = 640, 480
+local loginWindow = Window.new(loginParent, { width = 300, height = 150 })
+loginWindow:Close()
+loginWindow:Show()
+expect(loginWindow.root.hidden, false, "new login creates a usable window")
+loginWindow:Destroy()
 
 print("scroll_test: ok")

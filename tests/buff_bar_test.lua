@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     if actual ~= expected then
         error(message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
@@ -118,7 +120,7 @@ local function component(parent, kind)
         self.movedToFront = true
     end
     table.insert(parent.dynamicComponents, result)
-    return result
+    return Interfaces.component(result, parent)
 end
 
 local function componentFactory(kind)

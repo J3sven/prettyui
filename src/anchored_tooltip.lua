@@ -177,6 +177,7 @@ function AnchoredTooltip.new(parent, options)
         self.paddingY
     )
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetSize(self.width, self.height)
     self.root.clickthrough = options.clickthrough ~= false
@@ -344,7 +345,7 @@ end
 function AnchoredTooltip:Destroy()
     Event.Logic.Unsubscribe(self.eventID)
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
     self.parent = nil

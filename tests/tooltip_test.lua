@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     if actual ~= expected then
         error(message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
@@ -35,7 +37,7 @@ local function component(parent)
         self.destroyed = true
     end
     if parent then table.insert(parent.children, result) end
-    return result
+    return Interfaces.component(result, parent)
 end
 
 local parent = component()
@@ -155,4 +157,39 @@ childTooltip:Show()
 Tooltip.hideContextTooltips(contextCollection)
 expect(contextTooltip.root.hidden, true, "context tooltip hides with its window")
 expect(childTooltip.root.hidden, true, "nested panel tooltip hides with its window")
+local deadOwner = {}
+local deadTarget = component()
+Tooltip.bind(deadOwner, deadTarget, parent, "Logout")
+local deadTooltip = deadOwner.tooltip
+Interfaces.unload()
+deadTooltip:Hide()
+deadTooltip:Show()
+expect(deadTooltip:SetText("Ignored"), false, "dead tooltip rejects native updates")
+expect(Tooltip.set(deadOwner, "Ignored"), false, "dead binding cannot recreate components")
+deadTooltip:Destroy()
+deadTooltip:Destroy()
+expect(deadTooltip.root, nil, "dead tooltip drops its root without native access")
+Tooltip.unregisterContext(contextCollection)
+expect(Tooltip.getContext(contextCollection), nil, "logout removes tooltip contexts")
+Tooltip.unbind(deadOwner)
+
+-- Target and overlay may belong to different interfaces.
+local overlayParent = component()
+local separateTarget = component({ interfaceID = 2, children = {} })
+local separateTooltip = Tooltip.attach(separateTarget, overlayParent, "Separate interface")
+local survivingRoot = separateTooltip.root
+Interfaces.unload(2)
+separateTooltip:Show()
+separateTooltip:Destroy()
+expect(survivingRoot.destroyed, true, "target unload still cleans a live overlay")
+
+local survivingTarget = component()
+survivingTarget.clickthrough = true
+local separateParent = component({ interfaceID = 2, children = {} })
+local lostOverlay = Tooltip.attach(survivingTarget, separateParent, "Separate overlay")
+Interfaces.unload(2)
+lostOverlay:Hide()
+lostOverlay:Destroy()
+expect(survivingTarget.clickthrough, true, "overlay unload still restores a live target")
+
 print("tooltip_test: ok")

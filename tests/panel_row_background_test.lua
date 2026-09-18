@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     if actual ~= expected then
         error(message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
@@ -23,7 +25,7 @@ ui = {
                 self.destroyed = true
             end
             created[#created + 1] = rectangle
-            return rectangle
+            return Interfaces.component(rectangle, parent)
         end,
     },
 }
@@ -59,11 +61,13 @@ local entries = {
 }
 local panel = setmetatable({
     dock = {
-        content = { name = "dock" },
+        content = Interfaces.component({ name = "dock" }),
+        interfaceID = 1,
         container = { height = 88 },
     },
     overlay = {
-        content = { name = "overlay" },
+        content = Interfaces.component({ name = "overlay" }),
+        interfaceID = 1,
         container = { height = 88 },
     },
     dockOwner = { _managedFlowEntries = entries, contentHeight = 88 },

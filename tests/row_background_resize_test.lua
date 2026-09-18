@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     if actual ~= expected then
         error(message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
@@ -17,7 +19,7 @@ local function component(x, y, width, height)
     function value:SetY(nextY) self.y = nextY end
     function value:MoveToBack() self.movedToBack = true end
     function value:Destroy() self.destroyed = true end
-    return value
+    return Interfaces.component(value)
 end
 
 ui = {
@@ -41,6 +43,7 @@ local followingRoot = component(14, 40, 172, 20)
 local collapse = { root = collapseRoot }
 local following = { root = followingRoot }
 local owner = {
+    interfaceID = content.interfaceID,
     contentHeight = 72,
     _flowLayout = {
         paddingLeft = 14,
@@ -58,7 +61,7 @@ local owner = {
 }
 function owner:SetContentHeight(height) self.contentHeight = height end
 function owner:RefreshRowBackgrounds()
-    RowBackgrounds.clear(self.rowBackgrounds)
+    RowBackgrounds.clear(self.rowBackgrounds, self.interfaceID)
     self.rowBackgrounds = RowBackgrounds.apply(content, 120, self, { 10, 20 }, false)
 end
 

@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     if actual ~= expected then
         error(message .. ": expected " .. tostring(expected)
@@ -84,7 +86,7 @@ local function comboField()
         return true
     end
     function result:Destroy() end
-    return result
+    return Interfaces.component(result)
 end
 
 ui = {

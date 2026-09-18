@@ -122,6 +122,7 @@ function SelectionButton.new(kind, parent, choices, options)
         self:_RebuildSelectedValues()
     end
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
     self.root:SetSize(width, height, options.widthAnchor or 0, 0)
@@ -316,7 +317,7 @@ function SelectionButton:Destroy()
     end
     Tooltip.unbind(self)
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
     self.items = {}

@@ -69,6 +69,7 @@ function ComboBox.new(parent, options)
     self.disabled = options.disabled == true
     self._labelsByID = {}
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.ComboField.new(parent)
     self.root.stylesheetID = options.stylesheetID or id.StyleSheet.COMBO_DEFAULT
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
@@ -221,7 +222,10 @@ end
 
 function ComboBox:Destroy()
     Tooltip.unbind(self)
-    if self.root then self.root:Destroy() self.root = nil end
+    if self.root then
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
+        self.root = nil
+    end
 end
 
 return ComboBox

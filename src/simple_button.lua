@@ -74,6 +74,7 @@ function SimpleButton.new(parent, content, action, options)
     self.disabledTextColour = options.disabledColour or DISABLED_TEXT_COLOUR
     self.hoverCursor = options.hoverCursor or config.Cursor.CURSOR_BLANK
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
     self.root:SetSize(width, height)
@@ -207,7 +208,7 @@ end
 function SimpleButton:Destroy()
     Tooltip.unbind(self)
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
         self.content = nil
         self.parts = nil

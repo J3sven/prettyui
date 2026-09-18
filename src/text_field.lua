@@ -30,6 +30,7 @@ function TextField.new(parent, options)
     self.disabled = options.disabled == true
     self._scrollController = options._scrollController
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.InputField.new(parent)
     self.root.stylesheetID = options.stylesheetID or id.StyleSheet.INPUT_DEFAULT
     self.root:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, options.yAnchor or 0)
@@ -149,8 +150,12 @@ function TextField:Destroy()
         self._scrollController:UnregisterClipTarget(self)
         self._scrollController = nil
     end
+    self._unclippedAppearance = nil
     Tooltip.unbind(self)
-    if self.root then self.root:Destroy() self.root = nil end
+    if self.root then
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
+        self.root = nil
+    end
 end
 
 return TextField

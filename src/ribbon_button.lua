@@ -18,6 +18,7 @@ function RibbonButton.new(parent, spriteID, action, options)
     self.hovered = false
     self.active = false
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(
         options.x or 0,
@@ -69,6 +70,7 @@ function RibbonButton.new(parent, spriteID, action, options)
 end
 
 function RibbonButton:_UpdateState()
+    if self.background == nil or ui.Interfaces:GetInterface(self.interfaceID) == nil then return end
     if self.disabled then
         self.background.spriteID = Sprites.RIBBON_BUTTON_DISABLED
     elseif self.active then
@@ -81,7 +83,9 @@ function RibbonButton:_UpdateState()
 end
 
 function RibbonButton:SetIcon(spriteID)
-    self.icon.spriteID = spriteID
+    if self.icon and ui.Interfaces:GetInterface(self.interfaceID) ~= nil then
+        self.icon.spriteID = spriteID
+    end
 end
 
 function RibbonButton:SetActive(active)
@@ -96,7 +100,7 @@ end
 function RibbonButton:Destroy()
     Tooltip.unbind(self)
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
         self.background = nil
         self.icon = nil

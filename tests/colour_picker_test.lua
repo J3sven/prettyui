@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     if actual ~= expected then
         error(message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
@@ -37,7 +39,7 @@ local function component(parent, kind)
         parent.children = parent.children or {}
         table.insert(parent.children, result)
     end
-    return result
+    return Interfaces.component(result, parent)
 end
 
 local function canvas(parent)

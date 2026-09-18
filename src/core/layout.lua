@@ -27,6 +27,7 @@ end
 
 function Layout.configure(owner, options)
     options = options or {}
+    owner.interfaceID = owner.content.interfaceID
     local startY = options.startY or DEFAULT_START_Y
     owner._flowLayout = {
         startY = startY,
@@ -40,7 +41,6 @@ function Layout.configure(owner, options)
         hasItems = false,
         minimumContentHeight = owner.contentHeight or 0,
     }
-    owner._managedFlowComponents = {}
     owner._managedFlowEntries = {}
 end
 
@@ -112,7 +112,6 @@ function Layout.place(owner, value, defaults)
 end
 
 function Layout.manage(owner, component, placement)
-    table.insert(owner._managedFlowComponents, component)
     Layout.track(owner, component, placement)
 
     -- Component:Destroy() removes the native UI object, but the flow layout also
@@ -132,6 +131,7 @@ end
 function Layout.track(owner, component, placement)
     table.insert(owner._managedFlowEntries, {
         component = component,
+        native = type(component) ~= "table" or component.root == nil,
         placement = placement or {},
     })
     return component
@@ -215,12 +215,7 @@ function Layout.remove(owner, component)
         end
     end
 
-    local components = owner._managedFlowComponents or {}
-    for index = #components, 1, -1 do
-        if components[index] == component then table.remove(components, index) end
-    end
-
-    if removed then reflow(owner) end
+    if removed and ui.Interfaces:GetInterface(owner.interfaceID) ~= nil then reflow(owner) end
     return removed
 end
 
@@ -267,14 +262,14 @@ function Layout.resize(owner, component, height)
 end
 
 function Layout.destroyManaged(owner)
-    local components = owner._managedFlowComponents or {}
+    local entries = owner._managedFlowEntries or {}
+    local loaded = ui.Interfaces:GetInterface(owner.interfaceID) ~= nil
     owner._destroyingManagedFlow = true
-    for index = #components, 1, -1 do
-        local component = components[index]
-        if component and component.Destroy then component:Destroy() end
+    for index = #entries, 1, -1 do
+        local entry = entries[index]
+        if not entry.native or loaded then entry.component:Destroy() end
     end
     owner._destroyingManagedFlow = nil
-    owner._managedFlowComponents = {}
     owner._managedFlowEntries = {}
 end
 

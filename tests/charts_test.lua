@@ -1,3 +1,5 @@
+local Interfaces = require("tests/interface_fixture")
+
 local function expect(actual, expected, message)
     assert(actual == expected, message .. ': expected ' .. tostring(expected) .. ', got ' .. tostring(actual))
 end
@@ -19,11 +21,11 @@ local function factory(kind)
     return {new=function(parent)
         local c={parent=parent,kind=kind,children={},hooks={},x=0,y=0,w=0,h=0,wa=0,ha=0}
         if parent then parent.children[#parent.children+1]=c end
-        return setmetatable(c,{__index=function(self,key)
+        return Interfaces.component(setmetatable(c,{__index=function(self,key)
             if key=='width' then return self.w+(self.parent and self.parent.width or 0)*self.wa end
             if key=='height' then return self.h+(self.parent and self.parent.height or 0)*self.ha end
             return methods[key]
-        end})
+        end}), parent)
     end}
 end
 ui={Hook={ONMOUSEOVER=1,ONMOUSEREPEAT=2,ONMOUSELEAVE=3,ONSCROLLWHEEL=4},AlignMode={TOPLEFT=0,CENTRE=1,BOTTOMRIGHT=2}}

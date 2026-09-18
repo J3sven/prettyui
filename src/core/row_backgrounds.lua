@@ -1,9 +1,10 @@
 local RowBackgrounds = {}
 local BACKGROUND_PADDING = 4
 
-function RowBackgrounds.clear(backgrounds)
+function RowBackgrounds.clear(backgrounds, interfaceID)
+    if ui.Interfaces:GetInterface(interfaceID) == nil then return end
     for _, background in ipairs(backgrounds or {}) do
-        if background.Destroy then background:Destroy() end
+        background:Destroy()
     end
 end
 

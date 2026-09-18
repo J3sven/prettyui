@@ -28,6 +28,7 @@ function Divider.new(parent, options)
     local widthAnchor = options.widthAnchor
     if widthAnchor == nil then widthAnchor = width <= 0 and 1.0 or 0 end
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Sprite.new(parent)
     self.root:SetPos(
         options.x or 0,
@@ -52,7 +53,7 @@ end
 function Divider:Destroy()
     Tooltip.unbind(self)
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
 end

@@ -21,7 +21,7 @@ local PanelContent = {}
 PanelContent.__index = PanelContent
 Scroll.install(PanelContent)
 local function refreshPanelRows(panel, surface, owner, key)
-    RowBackgrounds.clear(panel[key])
+    RowBackgrounds.clear(panel[key], surface.interfaceID)
     panel[key] = RowBackgrounds.apply(
         surface.content,
         surface.container.height,
@@ -92,6 +92,7 @@ local function createSurface(parent, options)
     local surface = {}
     local frame = Sprites.HUD_WINDOW
     surface.root = ui.Layer.new(parent)
+    surface.interfaceID = surface.root.interfaceID
     surface.root:SetPos(options.x, options.y, options.xAnchor or 0, options.yAnchor or 0)
     surface.root:SetSize(options.width, options.height, options.widthAnchor or 0, options.heightAnchor or 0)
     surface.root.clickthrough = options.clickthrough == true
@@ -346,6 +347,7 @@ function Panel.new(parent, options, flowManaged)
     self.overlayOwner._rowBackgroundSurface = self.overlay
     self.overlayOwner._rowBackgroundKey = "overlayRowBackgrounds"
     self.root = self.dock.root
+    self.interfaceID = self.dock.interfaceID
     self.content = self.dock.content
     self.overlayContent = self.overlay.content
     self.scrollable = self.dock.scroll.scrollable
@@ -396,7 +398,8 @@ function Panel:_SetAltDragActive(active)
     self.altDragSurface = activeSurface
 
     local function updateLayer(layer, surface)
-        if not layer then return end
+        if layer == nil or surface.root == nil or
+            ui.Interfaces:GetInterface(surface.interfaceID) == nil then return end
         local enabled = activeSurface == surface
         layer.enabled = enabled
         layer.clickthrough = not enabled
@@ -413,8 +416,12 @@ function Panel:_SetAltDragActive(active)
 
     if not activeSurface then
         self:_StopDrag()
-        if self.popoutButton then self.popoutButton:MoveToFront() end
-        if self.dockButton then self.dockButton:MoveToFront() end
+        if self.popoutButton and ui.Interfaces:GetInterface(self.dock.interfaceID) ~= nil then
+            self.popoutButton:MoveToFront()
+        end
+        if self.dockButton and ui.Interfaces:GetInterface(self.overlay.interfaceID) ~= nil then
+            self.dockButton:MoveToFront()
+        end
     end
 end
 
@@ -469,11 +476,10 @@ function Panel:_StopDrag()
     local dragLayer = surface == self.overlay and self.overlayDragLayer or self.dockDragLayer
     InterfaceMouse.EndCapture(dragLayer)
     self.dragState = nil
-    if surface then
-        if dragLayer then
-            dragLayer:SetPos(surface.root.x, surface.root.y)
-            dragLayer:SetSize(surface.root.width, surface.root.height)
-        end
+    if surface and surface.root and dragLayer and
+        ui.Interfaces:GetInterface(surface.interfaceID) ~= nil then
+        dragLayer:SetPos(surface.root.x, surface.root.y)
+        dragLayer:SetSize(surface.root.width, surface.root.height)
     end
     return false
 end
@@ -834,13 +840,13 @@ end
 function Panel:Destroy()
     unregisterAltDrag(self)
     self:_StopDrag()
-    Layout.destroyManaged(self.dockOwner)
-    Layout.destroyManaged(self.overlayOwner)
     if self.dock and self.dock.content then Tooltip.unregisterContext(self.dock.content) end
     if self.overlay and self.overlay.content then Tooltip.unregisterContext(self.overlay.content) end
+    Layout.destroyManaged(self.dockOwner)
+    Layout.destroyManaged(self.overlayOwner)
     Tooltip.unbind(self, "dockTooltip")
-    RowBackgrounds.clear(self.dockRowBackgrounds)
-    RowBackgrounds.clear(self.overlayRowBackgrounds)
+    RowBackgrounds.clear(self.dockRowBackgrounds, self.dock.interfaceID)
+    RowBackgrounds.clear(self.overlayRowBackgrounds, self.overlay.interfaceID)
     self.dockRowBackgrounds = {}
     self.overlayRowBackgrounds = {}
     Tooltip.unbind(self, "overlayTooltip")
@@ -852,13 +858,24 @@ function Panel:Destroy()
         self.overlay.scroll:Destroy()
         self.overlay.scroll = nil
     end
-    if self.dockDragLayer then self.dockDragLayer:Destroy() self.dockDragLayer = nil end
+    local dockLoaded = self.dock and ui.Interfaces:GetInterface(self.dock.interfaceID) ~= nil
+    local overlayLoaded = self.overlay and ui.Interfaces:GetInterface(self.overlay.interfaceID) ~= nil
+    if self.dockDragLayer then
+        if dockLoaded then self.dockDragLayer:Destroy() end
+        self.dockDragLayer = nil
+    end
     if self.overlayDragLayer then
-        self.overlayDragLayer:Destroy()
+        if overlayLoaded then self.overlayDragLayer:Destroy() end
         self.overlayDragLayer = nil
     end
-    if self.dock and self.dock.root then self.dock.root:Destroy() end
-    if self.overlay and self.overlay.root then self.overlay.root:Destroy() end
+    if self.dock and self.dock.root then
+        if dockLoaded then self.dock.root:Destroy() end
+        self.dock.root = nil
+    end
+    if self.overlay and self.overlay.root then
+        if overlayLoaded then self.overlay.root:Destroy() end
+        self.overlay.root = nil
+    end
     self.root = nil
     self.content = nil
     self.overlayContent = nil

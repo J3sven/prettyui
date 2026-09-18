@@ -60,8 +60,12 @@ function ItemGrid:_RefreshSlotInteraction(index)
 end
 
 function ItemGrid:_ClearDropHover()
-    for _, slot in ipairs(self.slots) do
-        if slot.background then slot.background.spriteID = Sprites.ITEM_GRID_BACKGROUND end
+    if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then
+        for _, slot in ipairs(self.slots) do
+            if slot.background then
+                slot.background.spriteID = Sprites.ITEM_GRID_BACKGROUND
+            end
+        end
     end
     self.dropHoverIndex = nil
 end
@@ -123,7 +127,7 @@ function ItemGrid:_FinishDrag(commit)
     local destinationIndex = commit and self.dropHoverIndex or nil
     local sourceSlot = sourceIndex and self.slots[sourceIndex] or nil
     if sourceSlot then
-        if sourceSlot.item then
+        if sourceSlot.item and ui.Interfaces:GetInterface(sourceSlot.interfaceID) ~= nil then
             sourceSlot.item:SetPos(sourceSlot.itemInset, sourceSlot.itemInset)
             sourceSlot.item.alpha = 1
         end
@@ -141,11 +145,15 @@ function ItemGrid:_FinishDrag(commit)
         if movedSource and movedSource.item then movedSource.item.alpha = 1 end
         if movedDestination and movedDestination.item then movedDestination.item.alpha = 1 end
     end
-    if self.dragSprite then
+    local overlayLoaded = ui.Interfaces:GetInterface(self.overlayInterfaceID) ~= nil
+    if self.dragSprite and overlayLoaded then
         self.dragSprite.hidden = true
         self.dragSprite.alpha = 1
     end
-    if self.dragCapture then self.dragCapture:Destroy() self.dragCapture = nil end
+    if self.dragCapture then
+        if overlayLoaded then self.dragCapture:Destroy() end
+        self.dragCapture = nil
+    end
     return false
 end
 
@@ -258,6 +266,7 @@ function ItemGrid.new(parent, objects, options)
     self.slots = {}
     self.entries = {}
 
+    self.interfaceID = parent.interfaceID
     self.root = ui.Layer.new(parent)
     self.root:SetPos(
         options.x or 0,
@@ -276,6 +285,7 @@ function ItemGrid.new(parent, objects, options)
     local tooltipParent = parentContext and parentContext.parent or parent
     self.parentTooltipContext = parentContext
     self.overlayParent = tooltipParent
+    self.overlayInterfaceID = tooltipParent.interfaceID
     self.tooltipContext = Tooltip.registerContext(self.root, tooltipParent, function(target)
         local rootX = self.root.x or 0
         local rootY = self.root.y or 0
@@ -386,12 +396,12 @@ function ItemGrid:Destroy()
     self.entries = {}
     self.parentTooltipContext = nil
     if self.dragSprite then
-        self.dragSprite:Destroy()
+        if ui.Interfaces:GetInterface(self.overlayInterfaceID) ~= nil then self.dragSprite:Destroy() end
         self.dragSprite = nil
     end
     self.overlayParent = nil
     if self.root then
-        self.root:Destroy()
+        if ui.Interfaces:GetInterface(self.interfaceID) ~= nil then self.root:Destroy() end
         self.root = nil
     end
 end
