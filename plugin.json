@@ -1,6 +1,6 @@
 {
   "name": "PrettyUI",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Native-looking, sprite-backed UI components for RuneScape API plugins.",
   "requiredDependencies": [],
   "optionalDependencies": []
