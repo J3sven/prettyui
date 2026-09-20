@@ -405,6 +405,25 @@ function Tabs.new(parent, values, options)
     return self
 end
 
+function Tabs:BindFlow(owner)
+    self.flowOwner = owner
+    return self
+end
+
+function TabPage:_FitContent()
+    local tabs = self.tabs
+    local height = math.max(TAB_BASELINE + 1, self.contentHeight + TAB_BASELINE)
+    if tabs.flowOwner then
+        Layout.resize(tabs.flowOwner, tabs, height)
+    else
+        tabs.root:SetHeight(height)
+    end
+    for _, page in ipairs(tabs.pages) do
+        page._scroll:Refresh()
+        page:RefreshRowBackgrounds()
+    end
+end
+
 function Tabs:SetActive(index, notify)
     index = math.tointeger(index)
     local tab = index and self.tabs[index] or nil

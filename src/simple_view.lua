@@ -51,6 +51,11 @@ end
 
 ContentMethods.installSingle(SimpleView)
 
+function SimpleView:_FitContent()
+    self.root:SetHeight(math.max(1, self.contentHeight))
+    self:Refresh()
+end
+
 function SimpleView:SetTooltip(value)
     return Tooltip.set(self, value)
 end

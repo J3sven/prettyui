@@ -229,35 +229,11 @@ function Layout.resize(owner, component, height)
     local root = componentRoot(component)
     if root == nil then return end
 
-    local oldHeight = root.height or 0
     height = math.max(0, math.floor(height))
-    local delta = height - oldHeight
-    if delta == 0 then return end
+    if height == root.height then return end
     root:SetHeight(height)
 
-    local layout = owner._flowLayout
-    if layout == nil then return end
-    if layout.row and layout.row.y == root.y then
-        layout.row.height = height
-        growContent(owner, root.y + height)
-        refreshRowBackgrounds(owner)
-        return
-    end
-
-    local entries = owner._managedFlowEntries or {}
-    local found = false
-    for _, entry in ipairs(entries) do
-        if entry.component == component then
-            found = true
-        elseif found and entry.placement._flowAbsolute ~= true then
-            local followingRoot = componentRoot(entry.component)
-            if followingRoot and followingRoot.y > root.y then
-                followingRoot:SetY(followingRoot.y + delta)
-            end
-        end
-    end
-    layout.nextY = layout.nextY + delta
-    if owner.SetContentHeight then owner:SetContentHeight(owner.contentHeight + delta) end
+    reflow(owner)
     refreshRowBackgrounds(owner)
 end
 

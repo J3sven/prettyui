@@ -285,6 +285,12 @@ local function configureOwner(surface, options, context, overlayParent)
     return owner
 end
 
+function PanelContent:_FitContent()
+    local panel = self._rowBackgroundPanel
+    panel:SetSize(panel.width, self.contentHeight + BORDER_SIZE * 2)
+    panel:RefreshRowBackgrounds()
+end
+
 function Panel.getSize(options)
     options = options or {}
     return options.width or DEFAULT_WIDTH, options.height or DEFAULT_HEIGHT
@@ -589,6 +595,29 @@ ContentMethods.installPaired(Panel, function(panel)
     }
 end, pairObjects)
 
+local addPairedCollapseButton = Panel.AddCollapseButton
+
+function Panel:AddCollapseButton(text, options)
+    local copied = copyOptions(options)
+    local onToggle = copied.onToggle
+    local proxy
+    local syncing = false
+    copied.onToggle = function(section, expanded)
+        if syncing then return end
+        syncing = true
+        local other = section == proxy.dock and proxy.overlay or proxy.dock
+        other:SetExpanded(expanded)
+        syncing = false
+        if onToggle then onToggle(proxy, expanded) end
+    end
+    proxy = addPairedCollapseButton(self, text, copied)
+    rawset(proxy, "Toggle", function()
+        local active = self.poppedOut and proxy.overlay or proxy.dock
+        active:Toggle()
+    end)
+    return proxy
+end
+
 local addPairedTimeGraph = Panel.AddTimeGraph
 
 function Panel:AddTimeGraph(options)
@@ -659,6 +688,8 @@ function Panel:AddTabs(tabs, options)
     proxy = pairObjects(self,
         Layout.manage(self.dockOwner, Tabs.new(self.dock.content, tabs, dockOptions), dockOptions),
         Layout.manage(self.overlayOwner, Tabs.new(self.overlay.content, tabs, overlayOptions), overlayOptions))
+    proxy.dock:BindFlow(self.dockOwner)
+    proxy.overlay:BindFlow(self.overlayOwner)
     return proxy
 end
 

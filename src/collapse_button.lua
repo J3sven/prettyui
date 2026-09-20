@@ -76,6 +76,7 @@ function CollapseButton.new(parent, text, options)
     self.text = tostring(text or "")
     self.disabled = options.disabled == true
     self.expanded = options.expanded == true
+    self.resizeParent = options.resizeParent == true
     self.hovered = false
     self.pressed = false
     self.indent = options.indent or DEFAULT_INDENT
@@ -176,6 +177,9 @@ function CollapseButton:_Resize()
     local height = self:_ExpandedHeight()
     if self.flowOwner then
         Layout.resize(self.flowOwner, self, height)
+        if self.resizeParent and self.flowOwner._FitContent then
+            self.flowOwner:_FitContent()
+        end
     else
         self.root:SetHeight(height)
     end

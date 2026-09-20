@@ -53,6 +53,7 @@ local COMPONENTS = {
         measured = true,
         fillWidth = true,
         flowOptions = true,
+        bindFlow = true,
     },
     {
         method = "AddCollapseButton",

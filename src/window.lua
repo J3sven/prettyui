@@ -276,6 +276,12 @@ function Window:SetSize(width, height)
     self:_SyncOverlays(self.root.hidden == true)
 end
 
+function Window:_FitContent()
+    local top = self.title and TITLE_HEIGHT or BORDER
+    self:SetSize(self.root.width, self.contentHeight + top + BORDER)
+    self:RefreshRowBackgrounds()
+end
+
 function Window:SetTitle(title)
     self.title = title
     if self.titleText then self.titleText.content = title or "" end
