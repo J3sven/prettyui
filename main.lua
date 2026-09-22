@@ -4,6 +4,8 @@ local BuffBar = require("src/buff_bar")
 local TimeGraph = require("src/time_graph")
 local BarChart = require("src/bar_chart")
 local Histogram = require("src/histogram")
+local Dialog = require("src/dialog")
+local Confirm = require("src/confirm")
 
 local resources = Plugin.resources
 TextField.SetDefaultSprite(resources and (resources.input_default or resources["input_default.png"]))
@@ -17,6 +19,8 @@ local PrettyUI = {
     ColourPicker = require("src/colour_picker"),
     ComboBox = require("src/combo_box"),
     CollapseButton = require("src/collapse_button"),
+    Confirm = Confirm,
+    Dialog = Dialog,
     Divider = require("src/divider"),
     FancyButton = require("src/fancy_button"),
     Histogram = Histogram,
@@ -49,6 +53,7 @@ PrettyUI.version = "0.5.0"
 RibbonBar.Start()
 
 function PluginShutdown()
+    Dialog.Shutdown()
     RibbonBar.Shutdown()
     BuffBar.Shutdown()
     TimeGraph.Shutdown()
