@@ -2,7 +2,6 @@
   "name": "PrettyUI",
   "version": "0.7.2",
   "contactEmailAddress": "prettyui@nevs.me",
-  "description": "PrettyUI is a developer library that makes it trivial to create user interfaces with a look & feel that matches RuneScape's UI..",
   "requiredDependencies": {},
   "optionalDependencies": {}
 }
