@@ -323,4 +323,17 @@ function SelectionButton:Destroy()
     self.items = {}
 end
 
-return SelectionButton
+return {
+    CheckboxButton = {
+        getSize = SelectionButton.getSize,
+        new = function(parent, choices, options)
+            return SelectionButton.new("checkbox", parent, choices, options)
+        end,
+    },
+    RadioButton = {
+        getSize = SelectionButton.getSize,
+        new = function(parent, choices, options)
+            return SelectionButton.new("radio", parent, choices, options)
+        end,
+    },
+}

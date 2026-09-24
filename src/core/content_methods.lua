@@ -12,6 +12,7 @@ local ContentMethods = {}
 -- for nested hosts such as Tabs and Panel, which also install these methods.
 --
 -- Registry fields:
+--   export         named component exported by a shared module
 --   optionsIndex   position of the options argument (and number of constructor args)
 --   measured       obtain default dimensions from the component's getSize function
 --   measureArgs    number of non-option arguments accepted by getSize, when it
@@ -75,7 +76,8 @@ local COMPONENTS = {
     },
     {
         method = "AddRadioButton",
-        module = "src/radio_button",
+        module = "src/selection_button",
+        export = "RadioButton",
         optionsIndex = 2,
         measured = true,
         fillWidth = true,
@@ -84,7 +86,8 @@ local COMPONENTS = {
     },
     {
         method = "AddCheckboxButton",
-        module = "src/checkbox_button",
+        module = "src/selection_button",
+        export = "CheckboxButton",
         optionsIndex = 2,
         measured = true,
         fillWidth = true,
@@ -180,12 +183,18 @@ local function construct(component, spec, parent, args, placed)
     return callWithOptions(component.new, parent, args, spec.optionsIndex, placed)
 end
 
+local function loadComponent(spec)
+    local component = require(spec.module)
+    if spec.export then return component[spec.export] end
+    return component
+end
+
 local function addSingle(owner, spec, args)
     if spec.textTitle ~= nil then
         return require("src/text").append(owner, args[1], spec.textTitle)
     end
 
-    local component = require(spec.module)
+    local component = loadComponent(spec)
     local placed = place(owner, component, spec, args, args[spec.optionsIndex])
     local result = Layout.manage(owner, construct(component, spec, owner.content, args, placed), placed)
     if spec.bindFlow then return result:BindFlow(owner) end
@@ -229,7 +238,7 @@ local function addPaired(container, spec, args, getSides, pair)
 
     -- Each panel surface owns an independent component and layout entry. The
     -- returned proxy fans property and method access out to both concrete objects.
-    local component = require(spec.module)
+    local component = loadComponent(spec)
     local proxy
     local results = {}
     for index, side in ipairs(sides) do
