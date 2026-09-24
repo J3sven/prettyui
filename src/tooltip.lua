@@ -8,6 +8,7 @@ local BORDER_SIZE = 10
 local PADDING_X = 8
 local PADDING_Y = 5
 local OFFSET = 6
+local CURSOR_OFFSET = 12
 local DEFAULT_MAX_WIDTH = 240
 local FALLBACK_LINE_HEIGHT = 18
 local TEXT_COLOUR = 0xFFFFFFFF
@@ -59,11 +60,11 @@ local function placementOrder(preferred)
     return { "right", "left", "below", "above" }
 end
 
-local function placedPosition(placement, targetX, targetY, targetWidth, targetHeight, width, height)
-    if placement == "left" then return targetX - width - OFFSET, targetY end
-    if placement == "below" then return targetX, targetY + targetHeight + OFFSET end
-    if placement == "above" then return targetX, targetY - height - OFFSET end
-    return targetX + targetWidth + OFFSET, targetY
+local function placedPosition(placement, targetX, targetY, targetWidth, targetHeight, width, height, offset)
+    if placement == "left" then return targetX - width - offset, targetY end
+    if placement == "below" then return targetX, targetY + targetHeight + offset end
+    if placement == "above" then return targetX, targetY - height - offset end
+    return targetX + targetWidth + offset, targetY
 end
 
 local function fitsParent(x, y, width, height, parentWidth, parentHeight, margin)
@@ -194,6 +195,7 @@ function Tooltip.attach(target, parent, value, hoverHandlers)
     self.targetInterfaceID = target.interfaceID
     self.targetClickthrough = target.clickthrough
     self.options = options
+    self.followCursor = hoverHandlers and hoverHandlers.followCursor == true
     self.width = width
     self.height = height
     self.context = options.parent == nil and contexts[parent] or nil
@@ -258,7 +260,8 @@ function Tooltip.attach(target, parent, value, hoverHandlers)
 
     target.clickthrough = false
 
-    target:Subscribe(ui.Hook.ONMOUSEOVER, HOOK_ID, function()
+    target:Subscribe(ui.Hook.ONMOUSEOVER, HOOK_ID, function(_, x, y)
+        if self.followCursor then self.cursorX, self.cursorY = x, y end
         if hoverHandlers and hoverHandlers.onMouseOver then
             hoverHandlers.onMouseOver(self)
         else
@@ -274,6 +277,17 @@ function Tooltip.attach(target, parent, value, hoverHandlers)
         end
         return true
     end)
+
+    if self.followCursor then
+        target:Subscribe(ui.Hook.ONMOUSEREPEAT, HOOK_ID, function(_, x, y)
+            if self.root ~= nil and ui.Interfaces:GetInterface(self.interfaceID) ~= nil
+                and self.root.hidden ~= true then
+                self.cursorX, self.cursorY = x, y
+                self:Show()
+            end
+            return true
+        end)
+    end
 
     if self.context then table.insert(self.context.tooltips, self) end
 
@@ -291,13 +305,20 @@ function Tooltip:Show()
     end
     local targetWidth = self.target.width or 0
     local targetHeight = self.target.height or 0
+    local offset = OFFSET
+    if self.followCursor and self.cursorX ~= nil and self.cursorY ~= nil then
+        -- Hover coordinates are local interface units; reuse the overlay context origin.
+        targetX, targetY = targetX + self.cursorX, targetY + self.cursorY
+        targetWidth, targetHeight = 0, 0
+        offset = CURSOR_OFFSET
+    end
     local parentWidth = self.parent and (self.parent.width or 0) or 0
     local parentHeight = self.parent and (self.parent.height or 0) or 0
     local margin = self.options.boundsMargin or OFFSET
     local x, y
     for _, placement in ipairs(placementOrder(self.options.placement)) do
         local candidateX, candidateY = placedPosition(
-            placement, targetX, targetY, targetWidth, targetHeight, self.width, self.height
+            placement, targetX, targetY, targetWidth, targetHeight, self.width, self.height, offset
         )
         x, y = candidateX, candidateY
         if parentWidth <= 0 or parentHeight <= 0 or
@@ -333,6 +354,7 @@ function Tooltip:SetText(text)
 end
 
 function Tooltip:Hide()
+    self.cursorX, self.cursorY = nil, nil
     if self.root ~= nil and ui.Interfaces:GetInterface(self.interfaceID) ~= nil then
         self.root.hidden = true
     end
@@ -342,6 +364,7 @@ function Tooltip:Destroy()
     if self.target ~= nil and ui.Interfaces:GetInterface(self.targetInterfaceID) ~= nil then
         self.target:Unsubscribe(ui.Hook.ONMOUSEOVER, HOOK_ID)
         self.target:Unsubscribe(ui.Hook.ONMOUSELEAVE, HOOK_ID)
+        if self.followCursor then self.target:Unsubscribe(ui.Hook.ONMOUSEREPEAT, HOOK_ID) end
         self.target.clickthrough = self.targetClickthrough
     end
     self.target = nil

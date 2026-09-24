@@ -45,10 +45,15 @@ parent.width = 600
 parent.height = 400
 
 ui = {
-    Hook = { ONMOUSEOVER = 1, ONMOUSELEAVE = 2 },
+    Hook = { ONMOUSEOVER = 1, ONMOUSELEAVE = 2, ONMOUSEREPEAT = 3 },
+    AlignMode = { TOPLEFT = 1, CENTRE = 2 },
     Layer = { new = function(owner) return component(owner) end },
     Sprite = { new = function(owner) return component(owner) end },
-    Text = { new = function(owner) return component(owner) end },
+    Text = { new = function(owner)
+        local label = component(owner)
+        label.enabled = false
+        return label
+    end },
 }
 
 id = {
@@ -130,6 +135,78 @@ expect(boundTarget.clickthrough, true, "removing restores the original target in
 expect(Tooltip.set(owner, "Added again"), true, "a removed tooltip can be added again")
 expect(Tooltip.unbind(owner), true, "bindings can be destroyed")
 expect(Tooltip.set(owner, "Ignored"), false, "destroyed bindings reject updates")
+
+-- Dispatch hover only to input-enabled text, rather than calling Show directly.
+local function dispatchMouse(target, hook, x, y)
+    if target.enabled == false or target.hidden then return end
+    local prefix = tostring(hook) .. ":"
+    for key, callback in pairs(target.subscriptions) do
+        if key:sub(1, #prefix) == prefix then callback(target, x, y) end
+    end
+end
+
+local Text = require("src/text")
+local Host = {}
+require("src/core/content_methods").installSingle(Host)
+local textContent = component(parent)
+textContent.width = 400
+local textOwner = setmetatable({ content = textContent, contentWidth = 400 }, { __index = Host })
+require("src/core/layout").configure(textOwner)
+local textOriginY, scrollY = 100, 20
+Tooltip.registerContext(textContent, parent, function(label)
+    return label.x + 180, label.y + textOriginY - scrollY
+end)
+local label = textOwner:AddText({ text = "Hover me", width = 400, tooltip = "Text details" })
+local textOverlay = parent.children[#parent.children]
+expect(textOverlay.hidden, true, "text tooltip starts hidden")
+dispatchMouse(label, ui.Hook.ONMOUSEOVER, 12, 4)
+expect(textOverlay.hidden, false, "hovering flow text shows its tooltip")
+local cursorX = label.x + 180 + 12
+local cursorY = label.y + textOriginY - scrollY + 4
+expect(textOverlay.x > cursorX and textOverlay.x < cursorX + 24, true,
+    "wide text anchors its tooltip near the cursor, not the row edge")
+expect(textOverlay.y, cursorY, "cursor placement uses the scrolled overlay coordinate space")
+dispatchMouse(label, ui.Hook.ONMOUSEREPEAT, 50, 8)
+expect(textOverlay.x > cursorX + 38 and textOverlay.x < cursorX + 62, true,
+    "tooltip follows cursor movement within the text")
+scrollY = 40
+dispatchMouse(label, ui.Hook.ONMOUSEREPEAT, 50, 8)
+expect(textOverlay.y, label.y + textOriginY - scrollY + 8,
+    "cursor placement follows changes in the scroll context")
+dispatchMouse(label, ui.Hook.ONMOUSEREPEAT, 390, 8)
+expect(textOverlay.x + textOverlay.width < label.x + 180 + 390, true,
+    "tooltip flips left when the cursor is near the right edge")
+textOriginY = 400
+dispatchMouse(label, ui.Hook.ONMOUSEREPEAT, 12, 8)
+expect(textOverlay.y + textOverlay.height < label.y + textOriginY - scrollY + 8, true,
+    "tooltip flips above when the cursor is near the bottom edge")
+expect(textOverlay.x >= 0 and textOverlay.x + textOverlay.width <= parent.width
+    and textOverlay.y >= 0 and textOverlay.y + textOverlay.height <= parent.height, true,
+    "cursor-aligned tooltip stays inside the overlay parent")
+Tooltip.hideContextTooltips(textContent)
+dispatchMouse(label, ui.Hook.ONMOUSEREPEAT, 12, 8)
+expect(textOverlay.hidden, true, "mouse repeat does not reopen a hidden context tooltip")
+dispatchMouse(label, ui.Hook.ONMOUSEOVER, 12, 8)
+dispatchMouse(label, ui.Hook.ONMOUSELEAVE)
+expect(textOverlay.hidden, true, "leaving flow text hides its tooltip")
+
+local plainLabel = Text.new(textContent, { text = "Plain text" })
+local plainHover = false
+plainLabel:Subscribe(ui.Hook.ONMOUSEOVER, "test_hover", function() plainHover = true end)
+dispatchMouse(plainLabel, ui.Hook.ONMOUSEOVER)
+expect(plainHover, false, "text without a tooltip retains its native input behavior")
+local fixedLabel = Text.new(textContent, {
+    text = "Fixed tooltip",
+    tooltip = { text = "Explicit placement", x = 42, y = 48 },
+})
+local fixedOverlay = parent.children[#parent.children]
+dispatchMouse(fixedLabel, ui.Hook.ONMOUSEOVER, 100, 10)
+dispatchMouse(fixedLabel, ui.Hook.ONMOUSEREPEAT, 150, 15)
+expect(fixedOverlay.x, 42, "explicit tooltip x overrides cursor placement")
+expect(fixedOverlay.y, 48, "explicit tooltip y overrides cursor placement")
+dispatchMouse(label, ui.Hook.ONMOUSEOVER, 12, 8)
+Tooltip.unregisterContext(textContent)
+expect(textOverlay.destroyed, true, "destroying the text context removes its visible tooltip")
 
 local contextCollection = component()
 local context = Tooltip.registerContext(

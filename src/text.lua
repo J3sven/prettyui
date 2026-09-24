@@ -12,6 +12,7 @@ local BODY_GAP = 2
 local TITLE_GAP = 8
 local TITLE_MARGIN_TOP = 16
 local BODY_LINE_HEIGHT = 18
+local TOOLTIP_HOVER = { followCursor = true }
 
 local function fontConfig(fontID, isTitle)
     if fontID ~= nil and config.Font.FromID ~= nil then
@@ -57,8 +58,10 @@ local function create(parent, options, isTitle)
     label.alignVertical = options.alignVertical or ui.AlignMode.CENTRE
     label.maxLines = options.maxLines ~= nil and options.maxLines or (isTitle and 1 or 0)
     if options.lineSpacing ~= nil then label.lineSpacing = options.lineSpacing end
+    -- Decorative text needs input enabled before its tooltip can receive hover events.
+    if options.tooltip ~= nil then label.enabled = true end
     Wheel.bind(label, options)
-    Tooltip.attach(label, parent, options.tooltip)
+    Tooltip.attach(label, parent, options.tooltip, TOOLTIP_HOVER)
 
     return label
 end
