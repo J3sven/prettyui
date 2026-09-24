@@ -1,5 +1,6 @@
 local ItemSlot = require("src/item_slot")
 local Sprites = require("src/core/sprites")
+local clamp = require("src/core/math").clamp
 
 local AchievementPopup = {}
 AchievementPopup.__index = AchievementPopup
@@ -80,7 +81,7 @@ local function playCompletionSound(options)
 end
 
 function AchievementPopup:_SetVisualAlpha(alpha)
-    alpha = math.max(0, math.min(1, alpha))
+    alpha = clamp(alpha, 0, 1)
     for _, visual in ipairs(self.fadeVisuals) do
         if visual.component then visual.component.alpha = visual.alpha * alpha end
     end

@@ -1,3 +1,4 @@
+local clamp = require("src/core/math").clamp
 local hsvToRgb = require("src/core/colour").hsvToRgb
 local FancyButton = require("src/fancy_button")
 local InterfaceMouse = require("src/core/mouse")
@@ -46,10 +47,6 @@ local HUE_COLOURS = {
     0xFFFF00FF,
     0xFF0000FF,
 }
-
-local function clamp(value, minimum, maximum)
-    return math.max(minimum, math.min(maximum, value))
-end
 
 local function copyOptions(options)
     local copy = {}
@@ -157,11 +154,11 @@ function ColourPicker.new(parent, options)
     self.root = self.button.root
 
     if self.button.content then self.button.content:Destroy() end
-    local swatchSize = math.max(
+    local swatchSize = clamp(
+        math.floor(math.min(width, height) * SWATCH_PROPORTION),
         2,
-        math.floor(math.min(width, height) * SWATCH_PROPORTION)
+        math.min(width, height) - 6
     )
-    swatchSize = math.min(swatchSize, math.max(2, math.min(width, height) - 6))
     local swatchX = math.floor((width - swatchSize) / 2)
     local swatchY = math.floor((height - swatchSize) / 2)
     self.swatchFrame = rectangle(

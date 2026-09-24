@@ -2,6 +2,7 @@ local List = require("src/list")
 local Palette = require("src/core/control_palette")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
+local clamp = require("src/core/math").clamp
 
 local OrderedComboBox = {}
 OrderedComboBox.__index = OrderedComboBox
@@ -207,7 +208,7 @@ function OrderedComboBox:_LayoutDropdown()
     for _, entry in ipairs(self.entries) do
         if entry.visible then visible = visible + 1 end
     end
-    local rows = math.max(1, math.min(visible, self.maxVisibleEntries))
+    local rows = clamp(visible, 1, self.maxVisibleEntries)
     local height = rows * self.entryHeight + 2
     local rootHeight = self.root.height or DEFAULT_HEIGHT
     local dropdownY = y + rootHeight

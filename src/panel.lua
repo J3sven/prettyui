@@ -13,6 +13,7 @@ local TextField = require("src/text_field")
 local Tabs = require("src/tabs")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
+local clamp = require("src/core/math").clamp
 
 local Panel = {}
 Panel.__index = Panel
@@ -70,7 +71,7 @@ local function unregisterAltDrag(panel)
 end
 
 local function clampAlpha(value)
-    return math.max(0, math.min(1, tonumber(value) or 1))
+    return clamp(tonumber(value) or 1, 0, 1)
 end
 
 local function copyOptions(value)

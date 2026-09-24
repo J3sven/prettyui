@@ -1,3 +1,4 @@
+local clamp = require("src/core/math").clamp
 local Sprites = require("src/core/sprites")
 local ContentMethods = require("src/core/content_methods")
 local Text = require("src/text")
@@ -20,12 +21,6 @@ local CLOSE_SIZE = 20
 local CLOSE_RIGHT = 8
 local MIN_WIDTH = 220
 local MIN_HEIGHT = 140
-
-local function clamp(value, minimum, maximum)
-    if value < minimum then return minimum end
-    if maximum ~= nil and value > maximum then return maximum end
-    return value
-end
 
 local function sprite(parent, spriteID)
     local component = ui.Sprite.new(parent)

@@ -1,4 +1,5 @@
 local Sprites = require("src/core/sprites")
+local clamp = require("src/core/math").clamp
 
 local AnchoredTooltip = {}
 AnchoredTooltip.__index = AnchoredTooltip
@@ -306,8 +307,8 @@ function AnchoredTooltip:Update()
 
     local x = math.floor(screenPosition.x - self.width / 2 + self.offsetX + 0.5)
     local y = math.floor(screenPosition.y - self.height - self.offsetY + 0.5)
-    x = math.max(0, math.min(math.max(0, parentWidth - self.width), x))
-    y = math.max(0, math.min(math.max(0, parentHeight - self.height), y))
+    x = clamp(x, 0, math.max(0, parentWidth - self.width))
+    y = clamp(y, 0, math.max(0, parentHeight - self.height))
     self.root:SetPos(x, y)
     self.root.hidden = false
     self.root:MoveToBack()

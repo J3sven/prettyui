@@ -1,3 +1,4 @@
+local clamp = require("src/core/math").clamp
 local InterfaceMouse = require("src/core/mouse")
 local Sprites = require("src/core/sprites")
 
@@ -11,10 +12,6 @@ local END_SIZE = 5
 local MIN_THUMB_HEIGHT = 24
 local DEFAULT_CHILD_TOP_OFFSET = 12
 local scrollByContent = {}
-
-local function clamp(value, minimum, maximum)
-    return math.max(minimum, math.min(maximum, value))
-end
 
 local function topRelativeTo(root, ancestor)
     local top = 0

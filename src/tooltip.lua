@@ -1,4 +1,5 @@
 local Sprites = require("src/core/sprites")
+local clamp = require("src/core/math").clamp
 
 local Tooltip = {}
 Tooltip.__index = Tooltip
@@ -309,8 +310,8 @@ function Tooltip:Show()
     if self.options.constrainToParent ~= false and parentWidth > 0 and parentHeight > 0 then
         local maxX = math.max(margin, parentWidth - self.width - margin)
         local maxY = math.max(margin, parentHeight - self.height - margin)
-        x = math.max(margin, math.min(x, maxX))
-        y = math.max(margin, math.min(y, maxY))
+        x = clamp(x, margin, maxX)
+        y = clamp(y, margin, maxY)
     end
     self.root:SetPos(x, y)
     self.root.hidden = false

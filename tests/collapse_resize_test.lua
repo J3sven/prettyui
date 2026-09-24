@@ -92,6 +92,18 @@ expect(limited.scrollY, 0, "closing clamps stale scroll position")
 limitedSection:Toggle()
 expect(limited.root.height, 200, "reopening after clamping does not drift")
 
+local conflicting = Window.new(parent, {
+    width = 400, height = 300,
+    minWidth = 220, maxWidth = 100,
+    minHeight = 140, maxHeight = 80,
+})
+expect(conflicting.root.width, 220, "minimum width wins over a conflicting maximum at construction")
+expect(conflicting.root.height, 140, "minimum height wins over a conflicting maximum at construction")
+conflicting:SetSize(500, 400)
+expect(conflicting.root.width, 220, "resizing cannot fall below the minimum width")
+expect(conflicting.root.height, 140, "resizing cannot fall below the minimum height")
+conflicting:Destroy()
+
 local view = SimpleView.new(parent, { width = -100, widthAnchor = 1, height = 200 })
 local first = view:AddCollapseButton("First", { resizeParent = true, expanded = true })
 first:AddText({ text = "First body", height = 50 })

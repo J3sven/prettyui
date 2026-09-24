@@ -3,6 +3,7 @@ local InterfaceMouse = require("src/core/mouse")
 local Palette = require("src/core/control_palette")
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
+local clamp = require("src/core/math").clamp
 
 local List = {}
 List.__index = List
@@ -274,7 +275,7 @@ end
 function List:SetScrollPosition(value)
     local viewportHeight = self:_ViewportHeight()
     local maxScroll = math.max(0, (self.contentHeight or 0) - viewportHeight)
-    self.scrollY = math.max(0, math.min(maxScroll, math.floor(value or 0)))
+    self.scrollY = clamp(math.floor(value or 0), 0, maxScroll)
     self.viewport:SetScrollPos(0, self.scrollY)
     local rowWidth = math.max(1, self:_ResolvedWidth() - 2 - (maxScroll > 0 and BAR_WIDTH or 0))
     for _, row in ipairs(self.rows) do row.root:SetSize(rowWidth, self.entryHeight) end
@@ -286,11 +287,11 @@ function List:SetScrollPosition(value)
 
     self:_SetScrollbarHidden(false)
     local trackHeight = math.max(1, self.track.height)
-    local thumbHeight = math.max(
+    local thumbHeight = clamp(
+        math.floor(trackHeight * viewportHeight / self.contentHeight),
         math.min(MIN_THUMB_HEIGHT, trackHeight),
-        math.floor(trackHeight * viewportHeight / self.contentHeight)
+        trackHeight
     )
-    thumbHeight = math.min(trackHeight, thumbHeight)
     local travel = trackHeight - thumbHeight
     local thumbY = travel > 0 and math.floor(self.scrollY / maxScroll * travel) or 0
     self.thumbHeight = thumbHeight
