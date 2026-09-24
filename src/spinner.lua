@@ -8,11 +8,11 @@ Spinner.__index = Spinner
 local FRAMES = Sprites.LOADING_SPINNER_FRAMES
 local FRAME_COUNT = #FRAMES
 local DEFAULT_SIZE = 29
-local DEFAULT_TICKS_PER_FRAME = 5
+local DEFAULT_LOGIC_UPDATES_PER_FRAME = 5
 local nextInstanceID = 0
 
-local function clampTicks(value)
-    return math.max(1, math.floor(value or DEFAULT_TICKS_PER_FRAME))
+local function normaliseLogicUpdates(value)
+    return math.max(1, math.floor(value or DEFAULT_LOGIC_UPDATES_PER_FRAME))
 end
 
 function Spinner.new(parent, options)
@@ -23,8 +23,8 @@ function Spinner.new(parent, options)
     local self = setmetatable({}, Spinner)
     self.eventID = "prettyui_spinner_" .. tostring(nextInstanceID)
     self.frame = 1
-    self.tickAccumulator = 0
-    self.ticksPerFrame = clampTicks(options.ticksPerFrame)
+    self.logicUpdateAccumulator = 0
+    self.logicUpdatesPerFrame = normaliseLogicUpdates(options.logicUpdatesPerFrame)
     self.running = false
 
     self.interfaceID = parent.interfaceID
@@ -50,9 +50,9 @@ function Spinner:SetFrame(frame)
     if self.root then self.root.spriteID = FRAMES[self.frame] end
 end
 
-function Spinner:SetTicksPerFrame(ticks)
-    self.ticksPerFrame = clampTicks(ticks)
-    self.tickAccumulator = 0
+function Spinner:SetLogicUpdatesPerFrame(updates)
+    self.logicUpdatesPerFrame = normaliseLogicUpdates(updates)
+    self.logicUpdateAccumulator = 0
 end
 
 function Spinner:SetTooltip(value)
@@ -63,11 +63,11 @@ function Spinner:Start()
     if self.running or self.root == nil then return end
 
     self.running = true
-    self.tickAccumulator = 0
+    self.logicUpdateAccumulator = 0
     Event.Logic.Subscribe(self.eventID, function()
-        self.tickAccumulator = self.tickAccumulator + 1
-        if self.tickAccumulator >= self.ticksPerFrame then
-            self.tickAccumulator = 0
+        self.logicUpdateAccumulator = self.logicUpdateAccumulator + 1
+        if self.logicUpdateAccumulator >= self.logicUpdatesPerFrame then
+            self.logicUpdateAccumulator = 0
             self:SetFrame(self.frame + 1)
         end
     end)
@@ -77,11 +77,11 @@ function Spinner:Stop()
     if not self.running then return end
     Event.Logic.Unsubscribe(self.eventID)
     self.running = false
-    self.tickAccumulator = 0
+    self.logicUpdateAccumulator = 0
 end
 
 function Spinner:Reset()
-    self.tickAccumulator = 0
+    self.logicUpdateAccumulator = 0
     self:SetFrame(1)
 end
 

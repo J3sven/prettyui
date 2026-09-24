@@ -6,7 +6,7 @@ local BigSpinner = {}
 BigSpinner.__index = BigSpinner
 
 local DEFAULT_SIZE = 72
-local DEFAULT_DEGREES_PER_TICK = -6
+local DEFAULT_DEGREES_PER_LOGIC_UPDATE = -6
 local nextInstanceID = 0
 
 local function rotation(value)
@@ -19,7 +19,7 @@ function BigSpinner.new(parent, options)
 
     local self = setmetatable({}, BigSpinner)
     self.eventID = "prettyui_big_spinner_" .. tostring(nextInstanceID)
-    self.degreesPerTick = tonumber(options.degreesPerTick) or DEFAULT_DEGREES_PER_TICK
+    self.degreesPerLogicUpdate = tonumber(options.degreesPerLogicUpdate) or DEFAULT_DEGREES_PER_LOGIC_UPDATE
     self.rotation = rotation(options.rotation)
     self.running = false
 
@@ -56,8 +56,8 @@ function BigSpinner:SetRotation(degrees)
     if self.rotating then self.rotating.rotationDegrees = self.rotation end
 end
 
-function BigSpinner:SetDegreesPerTick(degrees)
-    self.degreesPerTick = tonumber(degrees) or DEFAULT_DEGREES_PER_TICK
+function BigSpinner:SetDegreesPerLogicUpdate(degrees)
+    self.degreesPerLogicUpdate = tonumber(degrees) or DEFAULT_DEGREES_PER_LOGIC_UPDATE
 end
 
 function BigSpinner:SetTooltip(value)
@@ -68,7 +68,7 @@ function BigSpinner:Start()
     if self.running or self.root == nil then return end
     self.running = true
     Event.Logic.Subscribe(self.eventID, function()
-        self:SetRotation(self.rotation + self.degreesPerTick)
+        self:SetRotation(self.rotation + self.degreesPerLogicUpdate)
     end)
 end
 
