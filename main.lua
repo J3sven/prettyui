@@ -45,7 +45,7 @@ local PrettyUI = {
     BuffBar = BuffBar,
 }
 
-PrettyUI.version = "0.5.0"
+PrettyUI.version = "0.7.2"
 
 RibbonBar.Start()
 
