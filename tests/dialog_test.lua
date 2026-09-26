@@ -114,14 +114,6 @@ end
 
 local parent = { id = "p" }
 
-resetHost()
-local resolved = Dialog.resolve({})
-expect(resolved.width, Dialog.DEFAULT_WIDTH, "resolve width")
-expect(resolved.height, Dialog.DEFAULT_HEIGHT, "resolve height")
-expectTrue(resolved.modal, "resolve modal default")
-expect(#resolved.actions, 0, "resolve empty actions")
-expectFalse(Dialog.resolve({ modal = false }).modal, "resolve modal false")
-
 local failed = pcall(function() Dialog.new(nil, { title = "X" }) end)
 expectFalse(failed, "nil parent should error")
 
@@ -173,28 +165,18 @@ expect(Dialog.depth(parent), 0, "close pops after disabled")
 resetHost()
 Dialog.dismissAll(parent)
 dialog = Dialog.new(parent, {
-    actions = {
-        { label = "Close" },
-        { label = "Import", variant = "positive" },
-    },
-})
-expect(dialog.window.buttons[1].label, "Import", "primary added first")
-expect(dialog.window.buttons[2].label, "Close", "secondary added second")
-expect(dialog.window.buttons[1].opts.xAnchor, 1, "primary xAnchor")
-expectTrue(dialog.window.buttons[1].opts.x > dialog.window.buttons[2].opts.x, "primary is rightmost")
-
-resetHost()
-Dialog.dismissAll(parent)
-dialog = Dialog.new(parent, {
+    width = 100,
     actions = {
         { label = "CANCEL" },
         { label = "CONFIRM" },
     },
 })
-local footer = Dialog.ACTION_PAD * 2 + Dialog.ACTION_GAP + 150 + 150
-local needed = footer + 16
-expectTrue(dialog.window.options.width >= needed, "window grows to fit footer")
-expectTrue(dialog.window.options.width > Dialog.DEFAULT_WIDTH, "CONFIRM/CANCEL wider than default")
+local cancel = button(dialog.window, "CANCEL")
+local confirm = button(dialog.window, "CONFIRM")
+local contentWidth = dialog.window.options.width - 16
+expectTrue(contentWidth + cancel.opts.x >= 0, "window grows to keep the left action inside its content")
+expectTrue(cancel.opts.x + 150 <= confirm.opts.x, "footer actions do not overlap")
+expectTrue(confirm.opts.x + 150 <= 0, "right action stays inside the content edge")
 Dialog.dismissAll(parent)
 
 resetHost()

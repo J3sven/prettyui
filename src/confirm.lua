@@ -2,35 +2,29 @@ local Dialog = require("src/dialog")
 
 local Confirm = {}
 
-Confirm.DEFAULT_TITLE = "CONFIRM"
-Confirm.DEFAULT_CONFIRM_LABEL = "CONFIRM"
-Confirm.DEFAULT_CANCEL_LABEL = "CANCEL"
-Confirm.DEFAULT_CONFIRM_VARIANT = "positive"
-Confirm.DEFAULT_WIDTH = Dialog.DEFAULT_WIDTH
-Confirm.DEFAULT_HEIGHT = Dialog.DEFAULT_HEIGHT
+local DEFAULT_TITLE = "CONFIRM"
+local DEFAULT_CONFIRM_LABEL = "CONFIRM"
+local DEFAULT_CANCEL_LABEL = "CANCEL"
+local DEFAULT_CONFIRM_VARIANT = "positive"
 
-function Confirm.resolve(options)
+local function resolve(options)
     options = options or {}
     return {
-        title = options.title or Confirm.DEFAULT_TITLE,
+        title = options.title or DEFAULT_TITLE,
         body = options.body or "",
-        cancelLabel = options.cancelLabel or Confirm.DEFAULT_CANCEL_LABEL,
-        confirmLabel = options.confirmLabel or Confirm.DEFAULT_CONFIRM_LABEL,
-        confirmVariant = options.confirmVariant or Confirm.DEFAULT_CONFIRM_VARIANT,
-        width = options.width or Confirm.DEFAULT_WIDTH,
-        height = options.height or Confirm.DEFAULT_HEIGHT,
+        cancelLabel = options.cancelLabel or DEFAULT_CANCEL_LABEL,
+        confirmLabel = options.confirmLabel or DEFAULT_CONFIRM_LABEL,
+        confirmVariant = options.confirmVariant or DEFAULT_CONFIRM_VARIANT,
+        width = options.width,
+        height = options.height,
         modal = options.modal ~= false,
         onConfirm = options.onConfirm,
         onCancel = options.onCancel,
     }
 end
 
-local function shouldClose(result)
-    return result ~= false
-end
-
 function Confirm.new(parent, options)
-    options = Confirm.resolve(options)
+    options = resolve(options)
     local body = options.body
     return Dialog.new(parent, {
         title = options.title,
@@ -49,7 +43,7 @@ function Confirm.new(parent, options)
                 variant = "neutral",
                 onClick = function()
                     if options.onCancel == nil then return true end
-                    return shouldClose(options.onCancel())
+                    return options.onCancel() ~= false
                 end,
             },
             {
@@ -57,7 +51,7 @@ function Confirm.new(parent, options)
                 variant = options.confirmVariant,
                 onClick = function()
                     if options.onConfirm == nil then return true end
-                    return shouldClose(options.onConfirm())
+                    return options.onConfirm() ~= false
                 end,
             },
         },

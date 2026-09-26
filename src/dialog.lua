@@ -4,23 +4,23 @@ local FancyButton = require("src/fancy_button")
 local Dialog = {}
 Dialog.__index = Dialog
 
-Dialog.DEFAULT_WIDTH = 328
-Dialog.DEFAULT_HEIGHT = 150
-Dialog.ACTION_GAP = 10
-Dialog.ACTION_PAD = 10
-Dialog.ACTION_Y = -35
-Dialog.DIM_ALPHA = 0.4
+local DEFAULT_WIDTH = 328
+local DEFAULT_HEIGHT = 150
+local ACTION_GAP = 10
+local ACTION_PAD = 10
+local ACTION_Y = -35
+local DIM_ALPHA = 0.4
 local WINDOW_BORDER = 8
 
 local stacks = {}
 local chrome = {}
 
-function Dialog.resolve(options)
+local function resolve(options)
     options = options or {}
     return {
         title = options.title or "",
-        width = options.width or Dialog.DEFAULT_WIDTH,
-        height = options.height or Dialog.DEFAULT_HEIGHT,
+        width = options.width or DEFAULT_WIDTH,
+        height = options.height or DEFAULT_HEIGHT,
         modal = options.modal ~= false,
         content = options.content,
         actions = options.actions or {},
@@ -70,7 +70,7 @@ local function ensureChrome(parent)
     rect.clickthrough = false
     rect:SetPos(0, 0)
     rect:SetSize(0, 0, 1.0, 1.0)
-    rect.colour = Vector4.new(0, 0, 0, Dialog.DIM_ALPHA)
+    rect.colour = Vector4.new(0, 0, 0, DIM_ALPHA)
 
     local blocker = ui.Layer.new(parent)
     blocker:SetPos(0, 0)
@@ -170,16 +170,12 @@ function Dialog.Shutdown()
     end
 end
 
-local function actionWidth(label)
-    return select(1, FancyButton.getSize(label))
-end
-
 local function footerWidth(actions)
     if actions == nil or #actions == 0 then return 0 end
-    local total = Dialog.ACTION_PAD * 2
+    local total = ACTION_PAD * 2
     for index, action in ipairs(actions) do
-        if index > 1 then total = total + Dialog.ACTION_GAP end
-        total = total + actionWidth(action.label or "")
+        if index > 1 then total = total + ACTION_GAP end
+        total = total + FancyButton.getSize(action.label or "")
     end
     return total
 end
@@ -199,11 +195,11 @@ local function bindAction(frame, action)
 end
 
 local function mountActions(window, frame, actions)
-    local x = -Dialog.ACTION_PAD
+    local x = -ACTION_PAD
     for index = #actions, 1, -1 do
         local action = actions[index]
         local label = action.label or ""
-        local width = actionWidth(label)
+        local width = FancyButton.getSize(label)
         x = x - width
         window:AddFancyButton(label, bindAction(frame, action), {
             variant = action.variant or "neutral",
@@ -212,15 +208,15 @@ local function mountActions(window, frame, actions)
             xAnchor = 1,
             yAnchor = 1,
             x = x,
-            y = Dialog.ACTION_Y,
+            y = ACTION_Y,
         })
-        x = x - Dialog.ACTION_GAP
+        x = x - ACTION_GAP
     end
 end
 
 function Dialog.new(parent, options)
     if parent == nil then error("Dialog requires a parent component") end
-    options = Dialog.resolve(options)
+    options = resolve(options)
 
     local self = setmetatable({
         parent = parent,

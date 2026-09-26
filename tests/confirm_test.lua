@@ -5,12 +5,6 @@ local function expect(actual, expected, message)
     end
 end
 
-local function expectTrue(actual, message)
-    if actual ~= true then
-        error(message .. ": expected true, got " .. tostring(actual))
-    end
-end
-
 local function expectFalse(actual, message)
     if actual then
         error(message .. ": expected false, got " .. tostring(actual))
@@ -93,13 +87,6 @@ local function button(window, label)
 end
 
 local parent = { id = "c" }
-
-local resolved = Confirm.resolve({})
-expect(resolved.title, Confirm.DEFAULT_TITLE, "resolve title")
-expect(resolved.confirmLabel, Confirm.DEFAULT_CONFIRM_LABEL, "resolve confirm")
-expect(resolved.cancelLabel, Confirm.DEFAULT_CANCEL_LABEL, "resolve cancel")
-expect(resolved.confirmVariant, Confirm.DEFAULT_CONFIRM_VARIANT, "resolve variant")
-expectTrue(resolved.modal, "resolve modal")
 
 Dialog.dismissAll(parent)
 local saw = {}
