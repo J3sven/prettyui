@@ -1,3 +1,4 @@
+local clamp = require("src/core/math").clamp
 local Cursor = require("src/core/cursor")
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
@@ -17,10 +18,6 @@ local THUMB_WIDTH = 11
 local THUMB_HEIGHT = 19
 local DEFAULT_WIDTH = 220
 local HEIGHT = 23
-
-local function clamp(value, minimum, maximum)
-    return math.max(minimum, math.min(maximum, value))
-end
 
 local function sprite(parent, spriteID)
     local component = ui.Sprite.new(parent)

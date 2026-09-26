@@ -1,6 +1,7 @@
 local Stream = require("src/core/time_graph_stream")
 local Wheel = require("src/core/wheel")
 local Tooltip = require("src/tooltip")
+local clamp = require("src/core/math").clamp
 
 local TimeGraph = {}
 TimeGraph.__index = TimeGraph
@@ -81,7 +82,7 @@ end
 local function visibleBuckets(capacity, zoom)
     assert(type(zoom) == "number" and zoom == zoom and zoom > 0 and zoom < math.huge,
         "graph zoom must be a positive finite number")
-    return math.max(2, math.min(capacity, math.floor(capacity / zoom + 0.5)))
+    return clamp(math.floor(capacity / zoom + 0.5), 2, capacity)
 end
 
 function TimeGraph.getSize(options)
@@ -190,7 +191,7 @@ function TimeGraph.new(parent, options)
 
     local function hover(_, x, y)
         if self.root == nil or self.plotWidth == nil or self.plotWidth <= 0 then return true end
-        local slot = math.min(self.visibleCount, math.max(1, math.floor(x * self.visibleCount / self.plotWidth) + 1))
+        local slot = clamp(math.floor(x * self.visibleCount / self.plotWidth) + 1, 1, self.visibleCount)
         if self.hoverSlot ~= slot or self.hoverX ~= x or self.hoverY ~= y then
             self.hoverSlot, self.hoverX, self.hoverY = slot, x, y
             self:_RenderHover()
@@ -242,7 +243,7 @@ function TimeGraph:_Layout(width, height)
     place(self.plot, left, top, plotWidth, plotHeight)
     place(self.plotBackground, 0, 0, plotWidth, plotHeight)
     local inset = math.min(4, math.floor(plotWidth / 4), math.floor(plotHeight / 4))
-    local labelHeight = math.min(18, math.max(0, plotHeight - inset * 2))
+    local labelHeight = clamp(plotHeight - inset * 2, 0, 18)
     for index = 1, 2 do
         local y = (index - 1) * math.max(0, plotHeight - 1)
         place(self.grid[index], 0, y, plotWidth, math.min(1, plotHeight))
@@ -349,7 +350,7 @@ function TimeGraph:_Render()
         local barHeight = math.abs(zeroY - valueY)
         bar.hidden = index < 1 or value == 0 or right <= left or barHeight == 0
         if not bar.hidden then
-            local gap = math.min(BAR_GAP, math.max(0, right - left - 1))
+            local gap = clamp(right - left - 1, 0, BAR_GAP)
             place(bar, left + math.floor(gap / 2), math.min(zeroY, valueY), right - left - gap, barHeight)
             local rgba = value < 0 and NEGATIVE_RGBA or self.barRGBA
             bar.rgba = rgba

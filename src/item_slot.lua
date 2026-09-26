@@ -1,6 +1,7 @@
 local Sprites = require("src/core/sprites")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
+local clamp = require("src/core/math").clamp
 
 local ItemSlot = {}
 ItemSlot.__index = ItemSlot
@@ -120,7 +121,7 @@ function ItemSlot.new(parent, object, options)
     self.tooltipValue = options.tooltip
     self.quantity = stackQuantity(options.quantity)
     self.quantityMode = options.quantityMode or ui.ObjectQuantityDisplayMode.MULTIPLE
-    self.itemInset = math.max(0, math.min(19, math.floor(options.itemInset or DEFAULT_ITEM_INSET)))
+    self.itemInset = clamp(math.floor(options.itemInset or DEFAULT_ITEM_INSET), 0, 19)
     self.outlineWidth = options.outlineWidth
     self.shadowRGBA = options.shadowRGBA
     self.backgroundSpriteID = options.backgroundSpriteID or Sprites.ITEM_SLOT_BACKGROUND

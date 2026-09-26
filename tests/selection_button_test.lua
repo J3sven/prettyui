@@ -94,10 +94,9 @@ package.loaded["src/tooltip"] = {
 }
 
 package.loaded["src/selection_button"] = nil
-package.loaded["src/checkbox_button"] = nil
-package.loaded["src/radio_button"] = nil
-local CheckboxButton = require("src/checkbox_button")
-local RadioButton = require("src/radio_button")
+local SelectionButtons = require("src/selection_button")
+local CheckboxButton = SelectionButtons.CheckboxButton
+local RadioButton = SelectionButtons.RadioButton
 
 local choices = {
     { text = "Audio", value = "audio" },

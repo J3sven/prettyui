@@ -1,7 +1,6 @@
 # PrettyUI
 
-PrettyUI is a reusable component library for RuneScape Client API Lua plugins.
+PrettyUI is a UI library that helps craft native-looking interfaces for your plugins. The aim is to offer something that delivers a uniform look and makes UI as simple as constructing a web page.
 
 ## Useful resources
 - [Documentation](https://prettyui.j3.gg/)
-- [Demo Plugin](https://github.com/J3sven/prettyui-demo)

@@ -1,7 +1,7 @@
 {
   "name": "PrettyUI",
-  "version": "0.7.1",
-  "description": "Native-looking, sprite-backed UI components for RuneScape API plugins.",
-  "requiredDependencies": [],
-  "optionalDependencies": []
+  "version": "0.7.3",
+  "contactEmailAddress": "prettyui@nevs.me",
+  "requiredDependencies": {},
+  "optionalDependencies": {}
 }

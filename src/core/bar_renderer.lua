@@ -1,6 +1,7 @@
 local Data = require("src/core/chart_data")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
+local clamp = require("src/core/math").clamp
 
 local Renderer = {}
 local DEFAULT_WIDTH, DEFAULT_HEIGHT = 480, 260
@@ -180,14 +181,14 @@ function Renderer:_Layout(width, height)
     place(self.plotBackground, 0, 0, pw, ph)
     place(self.empty, 0, 0, pw, ph)
     local inset = math.min(4, math.floor(pw / 4), math.floor(ph / 4))
-    local textHeight = math.min(18, math.max(0, ph - inset * 2))
+    local textHeight = clamp(ph - inset * 2, 0, 18)
     local half = math.floor(math.max(0, pw - inset * 2) / 2)
     local bottom = math.max(inset, ph - textHeight - inset)
     if horizontal then
         place(self.axisLabels[1], left + inset, bottom, half, textHeight)
         place(self.axisLabels[2], left + inset + half, bottom, half, textHeight)
     else
-        local labelWidth = math.min(80, math.max(0, pw - inset * 2))
+        local labelWidth = clamp(pw - inset * 2, 0, 80)
         local lowY = self.rangeLabels and math.max(inset, bottom - textHeight) or bottom
         place(self.axisLabels[1], left + inset, inset, labelWidth, textHeight)
         place(self.axisLabels[2], left + inset, lowY, labelWidth, textHeight)
@@ -322,7 +323,7 @@ function Renderer:_Render()
         local start, finish = self.edges[index], self.edges[index + 1]
         local value = histogram and row.count or row.value
         local endpoint = coordinate(value)
-        local gap = histogram and 0 or math.min(4, math.max(0, finish - start - 1))
+        local gap = histogram and 0 or clamp(finish - start - 1, 0, 4)
         bar.hidden = value == 0 or finish <= start or endpoint == zero or pw == 0 or ph == 0
         if not bar.hidden then
             if horizontal then

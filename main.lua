@@ -6,6 +6,7 @@ local BarChart = require("src/bar_chart")
 local Histogram = require("src/histogram")
 local Dialog = require("src/dialog")
 local Confirm = require("src/confirm")
+local SelectionButtons = require("src/selection_button")
 
 local resources = Plugin.resources
 TextField.SetDefaultSprite(resources and (resources.input_default or resources["input_default.png"]))
@@ -15,7 +16,7 @@ local PrettyUI = {
     AnchoredTooltip = require("src/anchored_tooltip"),
     BarChart = BarChart,
     BigSpinner = require("src/big_spinner"),
-    CheckboxButton = require("src/checkbox_button"),
+    CheckboxButton = SelectionButtons.CheckboxButton,
     ColourPicker = require("src/colour_picker"),
     ComboBox = require("src/combo_box"),
     CollapseButton = require("src/collapse_button"),
@@ -32,7 +33,7 @@ local PrettyUI = {
     Sprites = require("src/core/sprites"),
     RibbonButton = require("src/ribbon_button"),
     RibbonBar = RibbonBar,
-    RadioButton = require("src/radio_button"),
+    RadioButton = SelectionButtons.RadioButton,
     SimpleButton = require("src/simple_button"),
     Slider = require("src/slider"),
     Sprite = require("src/sprite"),
@@ -48,7 +49,7 @@ local PrettyUI = {
     BuffBar = BuffBar,
 }
 
-PrettyUI.version = "0.5.0"
+PrettyUI.version = "0.7.3"
 
 RibbonBar.Start()
 
