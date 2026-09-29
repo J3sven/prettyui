@@ -286,6 +286,10 @@ local function destroySurface()
 end
 
 local function ensureMounted()
+    if #entries == 0 then
+        if root ~= nil then destroySurface() end
+        return false
+    end
     local currentGameArea = ui.Interfaces:GetComponent(id.Component.TOPLEVEL_V2__GAME_AREA)
     if currentGameArea == nil then
         if gameArea ~= nil then destroySurface() end
@@ -361,6 +365,9 @@ function RibbonBar.Register(options)
         return existing.handle
     end
 
+    print("[PrettyUI] RibbonBar is deprecated; ribbon registration '" .. identifier ..
+        "' should be migrated to using the new native hasRibbonIcon and ContentLayer system.")
+
     local entry = {
         id = identifier,
         options = options,
@@ -384,7 +391,11 @@ function RibbonBar.Unregister(identifier)
     for index, candidate in ipairs(entries) do
         if candidate == entry then table.remove(entries, index) break end
     end
-    if root ~= nil then rebuildButtons() end
+    if #entries == 0 then
+        destroySurface()
+    elseif root ~= nil then
+        rebuildButtons()
+    end
     return true
 end
 
