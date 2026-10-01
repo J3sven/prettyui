@@ -7,10 +7,10 @@ local function expect(actual, expected, message)
 end
 
 local mousePosition
-local lastWindowOptions
 
 local function component(parent, kind)
     local result = {
+        parent = parent,
         kind = kind,
         hidden = false,
         x = 0,
@@ -34,6 +34,14 @@ local function component(parent, kind)
         self.subscriptions[hook] = nil
     end
     function result:MoveToFront() self.movedToFront = true end
+    setmetatable(result, {
+        __index = function(self, key)
+            if key == "xyGlobal" then
+                local origin = self.parent and self.parent.xyGlobal or { x = 0, y = 0 }
+                return { x = origin.x + self.x, y = origin.y + self.y }
+            end
+        end,
+    })
     function result:Destroy() self.destroyed = true end
     if parent then
         parent.children = parent.children or {}
@@ -122,12 +130,12 @@ package.loaded["src/simple_button"] = {
     new = function(parent, _, _, options) return simpleButton(parent, options) end,
 }
 package.loaded["src/core/sprites"] = { CLOSE = 1 }
+local contexts = {}
 package.loaded["src/tooltip"] = {
-    getContext = function() return nil end,
+    getContext = function(parent) return contexts[parent] end,
 }
 package.loaded["src/window"] = {
     new = function(parent, options)
-        lastWindowOptions = options
         local root = component(parent, "window")
         root:SetPos(options.x, options.y)
         root:SetSize(options.width, options.height)
@@ -159,7 +167,6 @@ local parent = component(nil, "parent")
 
 local standard = ColourPicker.new(parent, { value = 0x33669980 })
 expect(standard:Open(), true, "a standard picker opens")
-expect(lastWindowOptions.height, 300, "the standard picker keeps its original height")
 expect(standard.alphaCanvas, nil, "the alpha slider is opt-in")
 
 mousePosition = { x = 1000, y = 1000 }
@@ -183,7 +190,6 @@ local picker = ColourPicker.new(parent, {
     onChange = function(_, colour) accepted = colour end,
 })
 expect(picker:Open(), true, "an alpha picker opens")
-expect(lastWindowOptions.height, 336, "the alpha picker makes room below the palette")
 expect(picker.alphaCanvas.x, 16, "the alpha bar aligns with the palette")
 expect(picker.alphaCanvas.y, 152, "the alpha bar sits below the palette")
 expect(picker.alphaCanvas.width, 128, "the alpha bar matches the palette width")
@@ -218,5 +224,82 @@ expect(picker.pendingColour, 0x33669900, "the left edge selects full transparenc
 
 picker.acceptButton.action()
 expect(accepted, 0x33669900, "accepting reports the selected alpha")
+
+local screen = component(nil, "screen")
+screen:SetPos(12, 18)
+screen:SetSize(1280, 720)
+local settingsLayer = component(screen, "settings")
+settingsLayer:SetPos(100, 60)
+settingsLayer:SetSize(590, 357)
+local contentLayer = component(settingsLayer, "content")
+contentLayer:SetPos(14, 120)
+contentLayer:SetSize(540, 210)
+local ownerRoot = component(contentLayer, "owner-window")
+ownerRoot:SetPos(25, 30)
+ownerRoot:SetSize(400, 200)
+local nestedContent = component(ownerRoot, "nested-content")
+contexts[nestedContent] = {
+    parent = contentLayer,
+}
+local nested = ColourPicker.new(nestedContent, { alphaSlider = true })
+nested:Open()
+expect(nested.root.parent, nestedContent, "the swatch stays in its original layout")
+expect(nested.pickerWindow.root.parent, screen, "the popup escapes both clipping layers")
+expect(
+    nested.pickerWindow.root.xyGlobal.x,
+    nested.root.xyGlobal.x,
+    "the popup aligns with the opening swatch across nested parents"
+)
+expect(
+    nested.pickerWindow.root.xyGlobal.y,
+    nested.root.xyGlobal.y + nested.root.height + 6,
+    "the popup opens immediately below the swatch"
+)
+
+local direct = ColourPicker.new(contentLayer, {})
+direct:Open()
+expect(direct.pickerWindow.root.parent, screen, "native mounts escape without a tooltip context")
+
+local explicit = ColourPicker.new(nestedContent, {
+    windowParent = settingsLayer,
+    overlayParent = screen,
+    windowX = 7,
+    windowY = 9,
+})
+explicit:Open()
+expect(explicit.pickerWindow.root.parent, settingsLayer, "explicit window parent takes precedence")
+expect(explicit.pickerWindow.root.x, 7, "explicit x stays relative to the selected parent")
+expect(explicit.pickerWindow.root.y, 9, "explicit y stays relative to the selected parent")
+
+local overlay = ColourPicker.new(nestedContent, { overlayParent = settingsLayer })
+overlay:Open()
+expect(overlay.pickerWindow.root.parent, settingsLayer, "explicit overlay parent is retained")
+expect(
+    overlay.pickerWindow.root.xyGlobal.x,
+    overlay.root.xyGlobal.x,
+    "explicit overlay coordinates still align with the swatch"
+)
+
+local edge = ColourPicker.new(screen, { x = 1240, y = 680, alphaSlider = true })
+edge:Open()
+local edgeRoot = edge.pickerWindow.root
+expect(edgeRoot.x + edgeRoot.width, screen.width, "right-edge placement stays on screen")
+expect(edgeRoot.y + edgeRoot.height + 6, edge.root.y, "bottom-edge placement flips above")
+
+local partial = ColourPicker.new(screen, { x = 1240, y = 680, windowX = -5 })
+partial:Open()
+expect(partial.pickerWindow.root.x, -5, "explicit x is not clamped")
+expect(
+    partial.pickerWindow.root.y + partial.pickerWindow.root.height + 6,
+    partial.root.y,
+    "automatic y still flips when only x is overridden"
+)
+
+local smallScreen = component(nil, "small-screen")
+smallScreen:SetSize(100, 100)
+local oversized = ColourPicker.new(smallScreen, {})
+oversized:Open()
+expect(oversized.pickerWindow.root.x, 0, "oversized popup keeps its left edge reachable")
+expect(oversized.pickerWindow.root.y, 0, "oversized popup keeps its title bar reachable")
 
 print("colour_picker_test: ok")

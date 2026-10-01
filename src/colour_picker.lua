@@ -13,7 +13,8 @@ local BUTTON_SIZE = 24
 local SWATCH_PROPORTION = 0.65
 local DEFAULT_COLOUR = 0xFFFFFFFF
 local WINDOW_WIDTH = 220
-local WINDOW_HEIGHT = 300
+local WINDOW_HEIGHT = 312
+local POPUP_GAP = 6
 local FIELD_SIZE = 128
 local FIELD_X = 16
 local FIELD_Y = 12
@@ -111,14 +112,6 @@ local function rectangle(parent, x, y, width, height, colour, fill)
     return component
 end
 
-local function findOwnerWindow(context)
-    while context do
-        if context.ownerWindow then return context.ownerWindow end
-        context = context.parentContext
-    end
-    return nil
-end
-
 function ColourPicker.getSize(options)
     options = options or {}
     local size = options.buttonSize or options.size or BUTTON_SIZE
@@ -138,9 +131,13 @@ function ColourPicker.new(parent, options)
     )
     self.value = self.colour
     local context = Tooltip.getContext(parent)
-    self.ownerWindow = options.ownerWindow or findOwnerWindow(context)
     self.windowParent = options.windowParent or options.overlayParent or
         (context and context.parent) or parent
+    if options.windowParent == nil and options.overlayParent == nil then
+        while self.windowParent.parent ~= nil do
+            self.windowParent = self.windowParent.parent
+        end
+    end
 
     local buttonOptions = copyOptions(options)
     local width, height = ColourPicker.getSize(options)
@@ -185,16 +182,23 @@ function ColourPicker:_PickerWindowBounds()
     )
     local x = self.options.windowX or self.options.pickerX
     local y = self.options.windowY or self.options.pickerY
-    local ownerRoot = self.ownerWindow and self.ownerWindow.root or nil
-    if ownerRoot then
+    if x == nil or y == nil then
+        local swatchPosition = self.root.xyGlobal
+        local parentPosition = self.windowParent.xyGlobal
+        local swatchX = swatchPosition.x - parentPosition.x
+        local swatchY = swatchPosition.y - parentPosition.y
         if x == nil then
-            x = (ownerRoot.x or 0) + math.floor(((ownerRoot.width or width) - width) / 2)
+            x = clamp(swatchX, 0, math.max(0, self.windowParent.width - width))
         end
         if y == nil then
-            y = (ownerRoot.y or 0) + math.floor(((ownerRoot.height or height) - height) / 2)
+            y = swatchY + self.root.height + POPUP_GAP
+            if y + height > self.windowParent.height then
+                y = swatchY - height - POPUP_GAP
+            end
+            y = clamp(y, 0, math.max(0, self.windowParent.height - height))
         end
     end
-    return x or 80, y or 80, width, height
+    return x, y, width, height
 end
 
 function ColourPicker:_PickerYOffset()
@@ -639,7 +643,6 @@ function ColourPicker:Destroy()
     end
     self.root = nil
     self.parent = nil
-    self.ownerWindow = nil
     self.windowParent = nil
     self.onChange = nil
 end

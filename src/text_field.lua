@@ -43,7 +43,7 @@ function TextField.new(parent, options)
     self.root:Setup(
         options.visibility or ui.TextContentVisibilityMode.VISIBLE,
         options.filterMode or options.filter or ui.InputFieldFilterMode.NONE,
-        options.maxLength or 0
+        options.maxLength or 9999
     )
     self.root.inputMode = options.inputMode or ui.InputFieldKeyHandlingMode.DEFAULT
     self.root.emptyText = options.placeholder or options.emptyText or ""
