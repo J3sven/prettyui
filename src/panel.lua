@@ -227,6 +227,8 @@ local function createDragLayer(parent, surface, panel)
     return layer
 end
 
+local addPairedKeybindField
+
 local function pairObjects(panel, dock, overlay)
     local proxy = {}
     rawset(proxy, "dock", dock)
@@ -237,6 +239,13 @@ local function pairObjects(panel, dock, overlay)
             local active = panel.poppedOut and overlay or dock
             local value = active[key]
             if type(value) ~= "function" then return value end
+            if key == "AddKeybindField" then
+                return function(_, options)
+                    return addPairedKeybindField(panel, function(copied)
+                        return pairObjects(panel, dock:AddKeybindField(copied), overlay:AddKeybindField(copied))
+                    end, options)
+                end
+            end
             return function(_, ...)
                 local dockResult = dock[key](dock, ...)
                 local overlayResult = overlay[key](overlay, ...)
@@ -254,6 +263,47 @@ local function pairObjects(panel, dock, overlay)
             overlay[key] = value
         end,
     })
+end
+
+-- Values are detached arrays, while listening belongs only to the visible field.
+-- This also handles fields created through paired tab pages and collapse sections.
+addPairedKeybindField = function(panel, create, options)
+    local copied = copyOptions(options)
+    local onChange = copied.onChange
+    local proxy
+    copied.onChange = function(field, value)
+        local other = field == proxy.dock and proxy.overlay or proxy.dock
+        other:SetValue(value, false)
+        if onChange then onChange(proxy, value) end
+    end
+    proxy = create(copied)
+    local function active()
+        return panel.poppedOut and proxy.overlay or proxy.dock
+    end
+    rawset(proxy, "GetValue", function()
+        return active():GetValue()
+    end)
+    rawset(proxy, "SetValue", function(_, value, notify)
+        proxy.dock:SetValue(value, false)
+        proxy.overlay:SetValue(value, false)
+        if notify == true and onChange then onChange(proxy, active():GetValue()) end
+    end)
+    rawset(proxy, "StartListening", function()
+        local other = panel.poppedOut and proxy.dock or proxy.overlay
+        other:CancelListening()
+        return active():StartListening()
+    end)
+    rawset(proxy, "IsListening", function()
+        return active():IsListening()
+    end)
+    panel._keybindFields = panel._keybindFields or setmetatable({}, { __mode = "k" })
+    panel._keybindFields[proxy] = true
+    rawset(proxy, "Destroy", function()
+        panel._keybindFields[proxy] = nil
+        proxy.dock:Destroy()
+        proxy.overlay:Destroy()
+    end)
+    return proxy
 end
 
 local function configureOwner(surface, options, context, overlayParent)
@@ -508,9 +558,17 @@ end
 
 function Panel:SetPoppedOut(poppedOut, notify)
     local previous = self.poppedOut
+    local listening
+    for field in pairs(self._keybindFields or {}) do
+        if field:IsListening() then listening = field; break end
+    end
     self.poppedOut = self._canPopout and poppedOut == true
     self.dock.root.hidden = self.poppedOut
     self.overlay.root.hidden = not self.poppedOut
+    if previous ~= self.poppedOut and listening then
+        listening:CancelListening()
+        listening:StartListening()
+    end
     self:_UpdateFlowHeight()
     self.dock.scroll:Refresh()
     self.overlay.scroll:Refresh()
@@ -595,6 +653,14 @@ ContentMethods.installPaired(Panel, function(panel)
         { owner = panel.overlayOwner, content = panel.overlay.content },
     }
 end, pairObjects)
+
+local addKeybindField = Panel.AddKeybindField
+
+function Panel:AddKeybindField(options)
+    return addPairedKeybindField(self, function(copied)
+        return addKeybindField(self, copied)
+    end, options)
+end
 
 local addPairedCollapseButton = Panel.AddCollapseButton
 

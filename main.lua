@@ -1,4 +1,5 @@
 local TextField = require("src/text_field")
+local KeybindField = require("src/keybind_field")
 local RibbonBar = require("src/ribbon_bar")
 local BuffBar = require("src/buff_bar")
 local TimeGraph = require("src/time_graph")
@@ -28,6 +29,7 @@ local PrettyUI = {
     TimeGraph = TimeGraph,
     ItemSlot = require("src/item_slot"),
     ItemGrid = require("src/item_grid"),
+    KeybindField = KeybindField,
     List = require("src/list"),
     Panel = require("src/panel"),
     Sprites = require("src/core/sprites"),
@@ -54,6 +56,7 @@ PrettyUI.version = "1.0.0"
 RibbonBar.Start()
 
 function PluginShutdown()
+    KeybindField.Shutdown()
     Dialog.Shutdown()
     RibbonBar.Shutdown()
     BuffBar.Shutdown()

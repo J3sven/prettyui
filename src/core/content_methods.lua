@@ -103,6 +103,13 @@ local COMPONENTS = {
         fillWidth = true,
     },
     {
+        method = "AddKeybindField",
+        module = "src/keybind_field",
+        optionsIndex = 1,
+        measured = true,
+        fillWidth = true,
+    },
+    {
         method = "AddComboBox",
         module = "src/combo_box",
         optionsIndex = 1,

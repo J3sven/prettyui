@@ -285,6 +285,10 @@ function CollapseButton:AddTextField(options)
     return addFullWidthControl(self, TextField, options)
 end
 
+function CollapseButton:AddKeybindField(options)
+    return addFullWidthControl(self, require("src/keybind_field"), options)
+end
+
 function CollapseButton:AddComboBox(options)
     return addFullWidthControl(self, ComboBox, options)
 end
