@@ -7,6 +7,10 @@ local Layout = require("src/core/layout")
 local InterfaceMouse = require("src/core/mouse")
 local Scroll = require("src/core/scroll")
 local RowBackgrounds = require("src/core/row_backgrounds")
+local DragFeedback = require("src/core/drag_feedback")
+local DragBounds = require("src/core/drag_bounds")
+local Cursor = require("src/core/cursor")
+local Resize = require("src/core/resize")
 
 local Window = {}
 Window.__index = Window
@@ -139,19 +143,29 @@ function Window.new(parent, options)
         self.titleDrag:SetPos(self.root.x, self.root.y)
         self.titleDrag:SetSize(self.root.width - CLOSE_SIZE - 14, TITLE_HEIGHT)
         self.titleDrag.clickthrough = false
+        Cursor.apply(self.titleDrag, config.Cursor.TOPLEVEL_V2_MOVE, true)
 
         local dragStart = nil
         local captureExpanded = false
 
         local function stopDrag()
             dragStart = nil
+            if self.resize then self.resize:SetEnabled(true) end
             captureExpanded = false
+            if self.dragFeedback then
+                self.dragFeedback:Destroy()
+                self.dragFeedback = nil
+            end
             InterfaceMouse.EndCapture(self.titleDrag)
-            self.titleDrag:SetPos(self.root.x, self.root.y)
-            self.titleDrag:SetSize(self.root.width - CLOSE_SIZE - 14, TITLE_HEIGHT)
-            self:_SyncOverlays(false)
+            if self.root and self.titleDrag and
+                ui.Interfaces:GetInterface(self.interfaceID) ~= nil then
+                self.titleDrag:SetPos(self.root.x, self.root.y)
+                self.titleDrag:SetSize(self.root.width - CLOSE_SIZE - 14, TITLE_HEIGHT)
+                self:_SyncOverlays(false)
+            end
             return false
         end
+        self._stopDrag = stopDrag
 
         local function moveDrag(component, x, y)
             local mouse = InterfaceMouse.GetPosition(component, x, y)
@@ -162,21 +176,26 @@ function Window.new(parent, options)
                     dragStart.mouseY = mouse.y
                     dragStart.windowX = self.root.x
                     dragStart.windowY = self.root.y
+                    self.dragFeedback = DragFeedback.new(self.parent, self.root)
                     self.titleDrag:SetPos(0, 0)
                     self.titleDrag:SetSize(0, 0, 1.0, 1.0)
                     self.titleDrag:MoveToFront()
-                    return false
                 end
-                local nextX = dragStart.windowX + mouse.x - dragStart.mouseX
-                local nextY = dragStart.windowY + mouse.y - dragStart.mouseY
+                local nextX = clamp(dragStart.windowX + mouse.x - dragStart.mouseX,
+                    0, self.parent.width - self.root.width)
+                local nextY = clamp(dragStart.windowY + mouse.y - dragStart.mouseY,
+                    0, self.parent.height - self.root.height)
                 if self.root.x ~= nextX or self.root.y ~= nextY then
                     self.root:SetPos(nextX, nextY)
+                    self.dragBounds:RememberPosition()
                 end
+                self.dragFeedback:Update()
             end
             return false
         end
 
         self.titleDrag:Subscribe(ui.Hook.ONCLICK, function(component, x, y)
+            if self.resize then self.resize:SetEnabled(false) end
             InterfaceMouse.BeginScreenCapture(component, x, y)
             local mouse = InterfaceMouse.GetPosition(component, x, y)
             dragStart = {
@@ -192,6 +211,18 @@ function Window.new(parent, options)
         self.titleDrag:Subscribe(ui.Hook.ONHOLD, moveDrag)
         self.titleDrag:Subscribe(ui.Hook.ONRELEASE, stopDrag)
         self.titleDrag:Subscribe(ui.Hook.ONDRAGCOMPLETE, stopDrag)
+        self.dragBounds = DragBounds.new(self.parent, self.root, function(dx, dy)
+            if dragStart then
+                dragStart.windowX = dragStart.windowX + dx
+                dragStart.windowY = dragStart.windowY + dy
+            end
+            if not captureExpanded then
+                self.titleDrag:SetPos(self.root.x, self.root.y)
+                self.titleDrag:SetSize(self.root.width - CLOSE_SIZE - 14, TITLE_HEIGHT)
+            end
+            if self.dragFeedback then self.dragFeedback:Update() end
+            self:_SyncOverlays(self.root.hidden == true)
+        end)
     else
         self.topBorder = sprite(self.root, Sprites.BORDER_BOTTOM)
         self.topBorder:SetPos(CORNER_SIZE, 0)
@@ -258,6 +289,30 @@ function Window.new(parent, options)
     self.tooltipContext.ownerWindow = self
     Layout.configure(self, options.layout or options.textLayout)
     Tooltip.bind(self, self.root, parent, options.tooltip)
+    if options.resizable == true then
+        if not self.dragBounds then
+            self.dragBounds = DragBounds.new(self.parent, self.root, function()
+                self:_SyncOverlays(self.root.hidden == true)
+            end)
+        end
+        self.resize = Resize.new(self.parent, self.root, {
+            minWidth = self.minWidth,
+            minHeight = self.minHeight,
+            maxWidth = self.maxWidth,
+            maxHeight = self.maxHeight,
+            isVisible = function()
+                return self.root.hidden ~= true and self.root.visibleGlobal ~= false
+            end,
+            onBegin = function()
+                if self._stopDrag then self._stopDrag() end
+                self:Show()
+            end,
+            setRect = function(x, y, width, height)
+                self.root:SetPos(x, y)
+                self:SetSize(width, height)
+            end,
+        })
+    end
 
     return self
 end
@@ -267,7 +322,13 @@ function Window:SetSize(width, height)
         clamp(math.floor(width), self.minWidth, self.maxWidth),
         clamp(math.floor(height), self.minHeight, self.maxHeight)
     )
+    if self.dragBounds then self.dragBounds:RememberPosition() end
     self._scroll:Refresh()
+    if self.dragFeedback then self.dragFeedback:Update() end
+    if self.titleDrag and not self.dragFeedback then
+        self.titleDrag:SetPos(self.root.x, self.root.y)
+        self.titleDrag:SetSize(self.root.width - CLOSE_SIZE - 14, TITLE_HEIGHT)
+    end
     self:_SyncOverlays(self.root.hidden == true)
 end
 
@@ -323,6 +384,7 @@ function Window:_SyncOverlays(hidden)
             if not component.hidden then component:MoveToFront() end
         end
     end
+    if self.resize then self.resize:Refresh() end
 end
 
 function Window:Show()
@@ -337,6 +399,8 @@ function Window:Show()
 end
 
 function Window:Close()
+    if self._stopDrag then self._stopDrag() end
+    if self.resize then self.resize:Cancel() end
     if self.content then Tooltip.hideContextTooltips(self.content) end
     if self.onClose then self.onClose(self) end
     if self.destroyOnClose then
@@ -349,6 +413,16 @@ function Window:Close()
 end
 
 function Window:Destroy()
+    if self.resize then
+        self.resize:Destroy()
+        self.resize = nil
+    end
+    if self.dragBounds then
+        self.dragBounds:Destroy()
+        self.dragBounds = nil
+    end
+    if self._stopDrag then self._stopDrag() end
+    self._stopDrag = nil
     self:_SyncOverlays(true)
     RowBackgrounds.clear(self.rowBackgrounds, self.interfaceID)
     self.rowBackgrounds = {}

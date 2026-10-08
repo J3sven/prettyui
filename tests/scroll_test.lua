@@ -115,6 +115,7 @@ ui = {
         ONMOUSEOVER = 7,
         ONMOUSELEAVE = 8,
         ONCONTENTCHANGED = 9,
+        ONRESIZE = 10,
     },
     AlignMode = { TOPLEFT = 1, CENTRE = 2 },
     TextContentVisibilityMode = { VISIBLE = 1 },

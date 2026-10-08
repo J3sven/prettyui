@@ -49,7 +49,8 @@ ui = {
     Layer = factory("layer"), Sprite = factory("sprite"), Text = factory("text"),
     Interfaces = { GetComponent = function() return area end },
     Hook = { ONCLICK = 1, ONHOLD = 2, ONDRAG = 3, ONRELEASE = 4,
-        ONDRAGCOMPLETE = 5, ONSCROLLWHEEL = 6, ONMOUSEOVER = 7, ONMOUSELEAVE = 8 },
+        ONDRAGCOMPLETE = 5, ONSCROLLWHEEL = 6, ONMOUSEOVER = 7, ONMOUSELEAVE = 8,
+        ONRESIZE = 9 },
     AlignMode = { TOPLEFT = 1, CENTRE = 2 },
 }
 id = {

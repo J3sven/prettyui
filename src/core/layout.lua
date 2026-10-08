@@ -237,6 +237,41 @@ function Layout.resize(owner, component, height)
     refreshRowBackgrounds(owner)
 end
 
+-- Persist an interactive origin adjustment so later row reflows keep it.
+function Layout.resizeRect(owner, component, x, y, width, height)
+    local root = componentRoot(component)
+    if root == nil then return end
+    local dy = y - root.y
+    local hasRow = false
+    for _, entry in ipairs(owner._managedFlowEntries or {}) do
+        if entry.component == component then
+            local placement = entry.placement
+            if not placement._flowAbsolute then
+                if placement.inline and hasRow then
+                    placement.offsetY = (placement.offsetY or 0) + dy
+                else
+                    placement._flowMarginTop = (placement._flowMarginTop or 0) + dy
+                end
+            end
+            placement.x, placement.y = x, y
+            placement.xAnchor, placement.yAnchor = 0, 0
+            placement.width, placement.height = width, height
+            placement.widthAnchor = 0
+            placement._flowExplicitX = true
+            placement._flowFillWidth = false
+            placement._flowWidth = nil
+            break
+        end
+        if not entry.placement._flowAbsolute then
+            hasRow = not entry.placement._flowBreakAfter
+        end
+    end
+    root:SetPos(x, y)
+    root:SetSize(width, height)
+    reflow(owner)
+    refreshRowBackgrounds(owner)
+end
+
 function Layout.destroyManaged(owner)
     local entries = owner._managedFlowEntries or {}
     local loaded = ui.Interfaces:GetInterface(owner.interfaceID) ~= nil

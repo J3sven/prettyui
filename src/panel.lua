@@ -14,6 +14,9 @@ local Tabs = require("src/tabs")
 local Tooltip = require("src/tooltip")
 local Wheel = require("src/core/wheel")
 local clamp = require("src/core/math").clamp
+local DragFeedback = require("src/core/drag_feedback")
+local DragBounds = require("src/core/drag_bounds")
+local Resize = require("src/core/resize")
 
 local Panel = {}
 Panel.__index = Panel
@@ -56,7 +59,11 @@ end
 
 local function pollAltDrag()
     local active = isAltDown()
-    for panel in pairs(dragPanels) do panel:_SetAltDragActive(active) end
+    for panel in pairs(dragPanels) do
+        if panel.dockBounds then panel.dockBounds:Refresh() end
+        if panel.overlayBounds then panel.overlayBounds:Refresh() end
+        panel:_SetAltDragActive(active)
+    end
 end
 
 local function registerAltDrag(panel)
@@ -358,6 +365,10 @@ function Panel.new(parent, options, flowManaged)
     self.overlayParent = overlayParent
     self._dockDraggable = flowManaged ~= true
     self._canPopout = options.popout == true
+    self.minWidth = options.minWidth or BORDER_SIZE * 2 + 1
+    self.minHeight = options.minHeight or BORDER_SIZE * 2 + 1
+    self.maxWidth = options.maxWidth
+    self.maxHeight = options.maxHeight
     self.popoutClickthrough = options.popoutClickthrough == true
     self.popoutBackgroundAlpha = clampAlpha(options.popoutBackgroundAlpha or options.backgroundAlpha)
     self.onPopoutChange = options.onPopoutChange
@@ -439,6 +450,60 @@ function Panel.new(parent, options, flowManaged)
     self:SetPoppedOut(self.poppedOut, false)
     self:_SetAltDragActive(isAltDown())
     registerAltDrag(self)
+    local function watchBounds(parent, surface, layer)
+        return DragBounds.new(parent, surface.root, function(dx, dy)
+            local dragging = self.dragState and self.dragState.surface == surface
+            if dragging then
+                self.dragState.panelX = self.dragState.panelX + dx
+                self.dragState.panelY = self.dragState.panelY + dy
+            end
+            if not dragging or not self.dragState.captureExpanded then
+                layer:SetPos(surface.root.x, surface.root.y)
+                layer:SetSize(surface.root.width, surface.root.height)
+            end
+            if dragging and self.dragFeedback then self.dragFeedback:Update() end
+            surface.scroll:_LayoutThumbDrag()
+            local resize = surface == self.dock and self.dockResize or self.overlayResize
+            if resize then resize:Refresh() end
+        end)
+    end
+    if self.dockDragLayer then
+        self.dockBounds = watchBounds(self.parent, self.dock, self.dockDragLayer)
+    end
+    if self.overlayDragLayer then
+        self.overlayBounds = watchBounds(self.overlayParent, self.overlay, self.overlayDragLayer)
+    end
+    if self.dockBounds then self.dockBounds:Clamp() end
+    if self.overlayBounds then self.overlayBounds:Clamp() end
+    if options.resizable == true then
+        local function createResize(parent, surface)
+            return Resize.new(parent, surface.root, {
+                minWidth = self.minWidth,
+                minHeight = self.minHeight,
+                maxWidth = self.maxWidth,
+                maxHeight = self.maxHeight,
+                isVisible = function()
+                    return surface.root.hidden ~= true and surface.root.visibleGlobal ~= false
+                end,
+                onBegin = function()
+                    self:_StopDrag()
+                    surface.root:MoveToFront()
+                end,
+                setRect = function(x, y, width, height)
+                    if surface == self.dock and self.flowOwner then
+                        Layout.resizeRect(self.flowOwner, self, x, y, width, height)
+                    else
+                        surface.root:SetPos(x, y)
+                    end
+                    self:SetSize(width, height)
+                end,
+            })
+        end
+        self.dockResize = createResize(self.parent, self.dock)
+        if self._canPopout then
+            self.overlayResize = createResize(self.overlayParent, self.overlay)
+        end
+    end
     return self
 end
 
@@ -452,6 +517,7 @@ function Panel:_SetAltDragActive(active)
         end
     end
     if self.altDragSurface == activeSurface then return end
+    if self.dragState and self.dragState.surface ~= activeSurface then self:_StopDrag() end
     self.altDragSurface = activeSurface
 
     local function updateLayer(layer, surface)
@@ -461,7 +527,7 @@ function Panel:_SetAltDragActive(active)
         layer.enabled = enabled
         layer.clickthrough = not enabled
         layer.hidden = not enabled
-        Cursor.apply(layer, config.Cursor.CURSOR_USE, enabled)
+        Cursor.apply(layer, config.Cursor.TOPLEVEL_V2_MOVE, enabled)
         if enabled then
             layer:SetPos(surface.root.x, surface.root.y)
             layer:SetSize(surface.root.width, surface.root.height)
@@ -480,6 +546,8 @@ function Panel:_SetAltDragActive(active)
             self.dockButton:MoveToFront()
         end
     end
+    if self.dockResize then self.dockResize:Refresh() end
+    if self.overlayResize then self.overlayResize:Refresh() end
 end
 
 function Panel:_BeginDrag(surface, component, x, y)
@@ -490,6 +558,8 @@ function Panel:_BeginDrag(surface, component, x, y)
         InterfaceMouse.EndCapture(component)
         return false
     end
+    if self.dockResize then self.dockResize:SetEnabled(false) end
+    if self.overlayResize then self.overlayResize:SetEnabled(false) end
     self.dragState = {
         surface = surface,
         mouseX = mouse.x,
@@ -508,27 +578,37 @@ function Panel:_MoveDrag(component, x, y)
     local mouse = InterfaceMouse.GetPosition(component, x, y)
     if mouse then
         local drag = self.dragState
+        local parent = drag.surface == self.overlay and self.overlayParent or self.parent
         if not drag.captureExpanded then
             drag.captureExpanded = true
             drag.mouseX = mouse.x
             drag.mouseY = mouse.y
             drag.panelX = drag.surface.root.x
             drag.panelY = drag.surface.root.y
+            self.dragFeedback = DragFeedback.new(parent, drag.surface.root)
             component:SetPos(0, 0)
             component:SetSize(0, 0, 1.0, 1.0)
             component:MoveToFront()
-            return false
         end
-        local nextX = drag.panelX + mouse.x - drag.mouseX
-        local nextY = drag.panelY + mouse.y - drag.mouseY
+        local nextX = clamp(drag.panelX + mouse.x - drag.mouseX,
+            0, parent.width - drag.surface.root.width)
+        local nextY = clamp(drag.panelY + mouse.y - drag.mouseY,
+            0, parent.height - drag.surface.root.height)
         if drag.surface.root.x ~= nextX or drag.surface.root.y ~= nextY then
             drag.surface.root:SetPos(nextX, nextY)
+            local bounds = drag.surface == self.overlay and self.overlayBounds or self.dockBounds
+            bounds:RememberPosition()
         end
+        self.dragFeedback:Update()
     end
     return false
 end
 
 function Panel:_StopDrag()
+    if self.dragFeedback then
+        self.dragFeedback:Destroy()
+        self.dragFeedback = nil
+    end
     local surface = self.dragState and self.dragState.surface or nil
     local dragLayer = surface == self.overlay and self.overlayDragLayer or self.dockDragLayer
     InterfaceMouse.EndCapture(dragLayer)
@@ -538,6 +618,8 @@ function Panel:_StopDrag()
         dragLayer:SetPos(surface.root.x, surface.root.y)
         dragLayer:SetSize(surface.root.width, surface.root.height)
     end
+    if self.dockResize then self.dockResize:SetEnabled(true) end
+    if self.overlayResize then self.overlayResize:SetEnabled(true) end
     return false
 end
 
@@ -558,6 +640,10 @@ end
 
 function Panel:SetPoppedOut(poppedOut, notify)
     local previous = self.poppedOut
+    if previous ~= (self._canPopout and poppedOut == true) then
+        if self.dockResize then self.dockResize:Cancel() end
+        if self.overlayResize then self.overlayResize:Cancel() end
+    end
     local listening
     for field in pairs(self._keybindFields or {}) do
         if field:IsListening() then listening = field; break end
@@ -572,8 +658,12 @@ function Panel:SetPoppedOut(poppedOut, notify)
     self:_UpdateFlowHeight()
     self.dock.scroll:Refresh()
     self.overlay.scroll:Refresh()
+    local bounds = self.poppedOut and self.overlayBounds or self.dockBounds
+    if bounds then bounds:Clamp() end
     if self.poppedOut then self.overlay.root:MoveToFront() end
     self:_SetAltDragActive(isAltDown())
+    if self.dockResize then self.dockResize:Refresh() end
+    if self.overlayResize then self.overlayResize:Refresh() end
     if notify ~= false and previous ~= self.poppedOut and self.onPopoutChange then
         self.onPopoutChange(self, self.poppedOut)
     end
@@ -598,16 +688,21 @@ function Panel:SetPopoutBackgroundAlpha(alpha)
 end
 
 function Panel:SetSize(width, height)
-    self.width = math.max(BORDER_SIZE * 2 + 1, math.floor(width))
-    self.height = math.max(BORDER_SIZE * 2 + 1, math.floor(height))
+    self.width = clamp(math.floor(width), self.minWidth or BORDER_SIZE * 2 + 1, self.maxWidth)
+    self.height = clamp(math.floor(height), self.minHeight or BORDER_SIZE * 2 + 1, self.maxHeight)
     self.contentWidth = self.width - BORDER_SIZE * 2
     self.dock.root:SetWidth(self.width)
     self.overlay.root:SetSize(self.width, self.height)
     self:_UpdateFlowHeight()
+    if self.dockBounds then self.dockBounds:RememberPosition() end
+    if self.overlayBounds then self.overlayBounds:RememberPosition() end
     self.dockOwner.contentWidth = self.contentWidth
     self.overlayOwner.contentWidth = self.contentWidth
     self.dock.scroll:Refresh()
     self.overlay.scroll:Refresh()
+    if self.dockBounds then self.dockBounds:Clamp() end
+    if self.overlayBounds then self.overlayBounds:Clamp() end
+    if self.dragFeedback then self.dragFeedback:Update() end
     if self.dragState == nil then
         if self.dockDragLayer then
             self.dockDragLayer:SetPos(self.dock.root.x, self.dock.root.y)
@@ -618,6 +713,8 @@ function Panel:SetSize(width, height)
             self.overlayDragLayer:SetSize(self.overlay.root.width, self.overlay.root.height)
         end
     end
+    if self.dockResize then self.dockResize:Refresh() end
+    if self.overlayResize then self.overlayResize:Refresh() end
 end
 
 function Panel:SetTooltip(value)
@@ -936,6 +1033,10 @@ function Panel:AddSlider(options)
 end
 
 function Panel:Destroy()
+    if self.dockResize then self.dockResize:Destroy(); self.dockResize = nil end
+    if self.overlayResize then self.overlayResize:Destroy(); self.overlayResize = nil end
+    if self.dockBounds then self.dockBounds:Destroy(); self.dockBounds = nil end
+    if self.overlayBounds then self.overlayBounds:Destroy(); self.overlayBounds = nil end
     unregisterAltDrag(self)
     self:_StopDrag()
     if self.dock and self.dock.content then Tooltip.unregisterContext(self.dock.content) end
