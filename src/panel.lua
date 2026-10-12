@@ -503,8 +503,17 @@ function Panel.new(parent, options, flowManaged)
         if self._canPopout then
             self.overlayResize = createResize(self.overlayParent, self.overlay)
         end
+        self:_UpdateResizeEnabled()
     end
     return self
+end
+
+function Panel:_UpdateResizeEnabled()
+    local enabled = self.dragState == nil
+    if self.dockResize then self.dockResize:SetEnabled(enabled) end
+    if self.overlayResize then
+        self.overlayResize:SetEnabled(enabled and (not self.popoutClickthrough or isAltDown()))
+    end
 end
 
 function Panel:_SetAltDragActive(active)
@@ -516,7 +525,10 @@ function Panel:_SetAltDragActive(active)
             activeSurface = self.dock
         end
     end
-    if self.altDragSurface == activeSurface then return end
+    if self.altDragSurface == activeSurface then
+        self:_UpdateResizeEnabled()
+        return
+    end
     if self.dragState and self.dragState.surface ~= activeSurface then self:_StopDrag() end
     self.altDragSurface = activeSurface
 
@@ -546,6 +558,7 @@ function Panel:_SetAltDragActive(active)
             self.dockButton:MoveToFront()
         end
     end
+    self:_UpdateResizeEnabled()
     if self.dockResize then self.dockResize:Refresh() end
     if self.overlayResize then self.overlayResize:Refresh() end
 end
@@ -618,8 +631,7 @@ function Panel:_StopDrag()
         dragLayer:SetPos(surface.root.x, surface.root.y)
         dragLayer:SetSize(surface.root.width, surface.root.height)
     end
-    if self.dockResize then self.dockResize:SetEnabled(true) end
-    if self.overlayResize then self.overlayResize:SetEnabled(true) end
+    self:_UpdateResizeEnabled()
     return false
 end
 
@@ -680,6 +692,7 @@ function Panel:SetPopoutClickthrough(clickthrough)
     self.overlay.container.clickthrough = self.popoutClickthrough
     self.overlay.container.enabled = not self.popoutClickthrough
     self.overlay.scroll:SetClickthrough(self.popoutClickthrough)
+    self:_UpdateResizeEnabled()
 end
 
 function Panel:SetPopoutBackgroundAlpha(alpha)

@@ -336,6 +336,35 @@ expect(inlineSibling.root.x >= flowPanel.root.x + flowPanel.root.width, true,
     "redocking reflows inline siblings using the new width")
 flowHost:Destroy()
 
+-- Click-through popouts expose resize edges only while Alt is held. Changing
+-- either input state cancels a resize that is no longer allowed.
+local clickthroughPanel = Panel.new(parent, {
+    resizable = true, popout = true, poppedOut = true, popoutClickthrough = true,
+    overlayParent = overlayParent, width = 300, height = 200,
+})
+local clickthroughResize = clickthroughPanel.overlayResize
+expect(clickthroughResize.enabled, false, "click-through popout resize requires Alt")
+for _, edge in pairs(clickthroughResize.handles) do
+    expect(edge.hidden, true, "click-through popout resize edges stay hidden without Alt")
+    expect(edge.clickthrough, true, "hidden click-through popout edges do not intercept input")
+end
+setAlt(true)
+expect(clickthroughResize.enabled, true, "Alt enables click-through popout resize")
+handle = begin(clickthroughResize, "se", clickthroughPanel.overlay.root)
+active = clickthroughResize.feedback.active
+setAlt(false)
+expectCleared(clickthroughResize, active, "releasing Alt on a click-through popout")
+for _, edge in pairs(clickthroughResize.handles) do
+    expect(edge.hidden, true, "releasing Alt hides click-through popout resize edges")
+end
+clickthroughPanel:SetPopoutClickthrough(false)
+expect(clickthroughResize.enabled, true, "disabling click-through enables ordinary resize")
+handle = begin(clickthroughResize, "e", clickthroughPanel.overlay.root)
+active = clickthroughResize.feedback.active
+clickthroughPanel:SetPopoutClickthrough(true)
+expectCleared(clickthroughResize, active, "enabling click-through without Alt")
+clickthroughPanel:Destroy()
+
 -- Inline requests can become the first item in a row, initially or after removal.
 for _, placement in ipairs({ "first", "inline", "removed" }) do
     flowHost = Window.new(parent, { title = "First inline", width = 800, height = 600 })

@@ -183,10 +183,22 @@ function ColourPicker:_PickerWindowBounds()
     local x = self.options.windowX or self.options.pickerX
     local y = self.options.windowY or self.options.pickerY
     if x == nil or y == nil then
-        local swatchPosition = self.root.xyGlobal
-        local parentPosition = self.windowParent.xyGlobal
-        local swatchX = swatchPosition.x - parentPosition.x
-        local swatchY = swatchPosition.y - parentPosition.y
+        local context = Tooltip.getContext(self.parent)
+        local swatchX, swatchY
+        if context and context.active ~= false and context.position then
+            swatchX, swatchY = context.position(self.root)
+            if context.parent ~= self.windowParent then
+                local contextPosition = context.parent.xyGlobal
+                local parentPosition = self.windowParent.xyGlobal
+                swatchX = swatchX + contextPosition.x - parentPosition.x
+                swatchY = swatchY + contextPosition.y - parentPosition.y
+            end
+        else
+            local swatchPosition = self.root.xyGlobal
+            local parentPosition = self.windowParent.xyGlobal
+            swatchX = swatchPosition.x - parentPosition.x
+            swatchY = swatchPosition.y - parentPosition.y
+        end
         if x == nil then
             x = clamp(swatchX, 0, math.max(0, self.windowParent.width - width))
         end

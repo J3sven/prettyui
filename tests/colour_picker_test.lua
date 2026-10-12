@@ -78,7 +78,7 @@ local function canvas(parent)
     return result
 end
 
-local function simpleButton(parent, options)
+local function simpleButton(parent, options, action)
     local root = component(parent, "button")
     root:SetPos(options and options.x or 0, options and options.y or 0)
     root:SetSize(options and options.width or 24, options and options.height or 24)
@@ -86,6 +86,7 @@ local function simpleButton(parent, options)
     return {
         root = root,
         content = content,
+        action = action,
         SetDisabled = function(self, disabled) self.disabled = disabled end,
         SetHoverCursor = function() end,
         Destroy = function(self) self.root:Destroy() end,
@@ -127,7 +128,7 @@ package.loaded["src/core/mouse"] = {
     end,
 }
 package.loaded["src/simple_button"] = {
-    new = function(parent, _, _, options) return simpleButton(parent, options) end,
+    new = function(parent, _, action, options) return simpleButton(parent, options, action) end,
 }
 package.loaded["src/core/sprites"] = { CLOSE = 1 }
 local contexts = {}
@@ -241,6 +242,11 @@ local nestedContent = component(ownerRoot, "nested-content")
 contexts[nestedContent] = {
     parent = contentLayer,
 }
+local scrollY = 0
+contexts[nestedContent].position = function(target)
+    return target.xyGlobal.x - contentLayer.xyGlobal.x,
+        target.xyGlobal.y - contentLayer.xyGlobal.y - scrollY
+end
 local nested = ColourPicker.new(nestedContent, { alphaSlider = true })
 nested:Open()
 expect(nested.root.parent, nestedContent, "the swatch stays in its original layout")
@@ -254,6 +260,20 @@ expect(
     nested.pickerWindow.root.xyGlobal.y,
     nested.root.xyGlobal.y + nested.root.height + 6,
     "the popup opens immediately below the swatch"
+)
+
+local scrolled = ColourPicker.new(nestedContent, { x = 32, y = 200 })
+scrollY = 120
+scrolled.button.action()
+expect(
+    scrolled.pickerWindow.root.xyGlobal.x,
+    scrolled.root.xyGlobal.x,
+    "a scrolled popup aligns horizontally with its clicked button"
+)
+expect(
+    scrolled.pickerWindow.root.xyGlobal.y,
+    scrolled.root.xyGlobal.y - scrollY + scrolled.root.height + 6,
+    "a scrolled popup opens beside the button's visible position"
 )
 
 local direct = ColourPicker.new(contentLayer, {})

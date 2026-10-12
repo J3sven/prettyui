@@ -21,11 +21,12 @@ local ContentMethods = {}
 --   flowOptions    normalize options with the component's flowOptions function
 --   bindFlow       bind a component whose height can alter its owner's flow layout
 --   proxyCallbacks replace the concrete panel child passed to callbacks with its proxy
+--   refreshRowBackgrounds  refresh painted rows after adding a control
 local COMPONENTS = {
     { method = "AddText", textTitle = false },
     { method = "AddTitle", textTitle = true },
     { method = "AddSprite", module = "src/sprite", optionsIndex = 2, measured = true, measureArgs = 0 },
-    { method = "AddSpinner", module = "src/spinner", optionsIndex = 1, width = 29, height = 29 },
+    { method = "AddSpinner", module = "src/spinner", optionsIndex = 1, width = 72, height = 72 },
     { method = "AddBigSpinner", module = "src/big_spinner", optionsIndex = 1, width = 72, height = 72 },
     { method = "AddTimeGraph", module = "src/time_graph", optionsIndex = 1, measured = true, fillWidth = true },
     { method = "AddBarChart", module = "src/bar_chart", optionsIndex = 1, measured = true, fillWidth = true },
@@ -133,7 +134,14 @@ local COMPONENTS = {
         measured = true,
         measureArgs = 1,
     },
-    { method = "AddSlider", module = "src/slider", optionsIndex = 1, measured = true, fillWidth = true },
+    {
+        method = "AddSlider",
+        module = "src/slider",
+        optionsIndex = 1,
+        measured = true,
+        fillWidth = true,
+        refreshRowBackgrounds = true,
+    },
     {
         method = "AddFancyButton",
         module = "src/fancy_button",
@@ -204,6 +212,10 @@ local function addSingle(owner, spec, args)
     local component = loadComponent(spec)
     local placed = place(owner, component, spec, args, args[spec.optionsIndex])
     local result = Layout.manage(owner, construct(component, spec, owner.content, args, placed), placed)
+    if spec.refreshRowBackgrounds and owner.rowBackgroundColours
+        and #owner.rowBackgroundColours > 0 and owner.RefreshRowBackgrounds then
+        owner:RefreshRowBackgrounds()
+    end
     if spec.bindFlow then return result:BindFlow(owner) end
     return result
 end
@@ -270,6 +282,10 @@ local function addPaired(container, spec, args, getSides, pair)
         if spec.bindFlow then results[index]:BindFlow(side.owner) end
     end
     proxy = pair(container, results[1], results[2])
+    if spec.refreshRowBackgrounds and container.rowBackgroundColours
+        and #container.rowBackgroundColours > 0 and container.RefreshRowBackgrounds then
+        container:RefreshRowBackgrounds()
+    end
     return proxy
 end
 

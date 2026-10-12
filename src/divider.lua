@@ -12,6 +12,7 @@ function Divider.flowOptions(options)
     if type(options) == "table" then
         for key, value in pairs(options) do copied[key] = value end
     end
+    if copied.rowBackground == nil then copied.rowBackground = false end
     if copied.x == nil and copied.width == nil and copied.widthAnchor == nil then
         copied.x = 0
         copied.width = 0

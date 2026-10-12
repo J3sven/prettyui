@@ -8,6 +8,7 @@ function RowBackgrounds.clear(backgrounds, interfaceID)
     end
 end
 
+
 function RowBackgrounds.apply(content, viewportHeight, owner, colours, edgeToEdge)
     local backgrounds = {}
     if type(colours) ~= "table" or #colours == 0 then return backgrounds end
