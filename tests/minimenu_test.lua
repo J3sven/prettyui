@@ -7,21 +7,53 @@ local function expect(actual, expected, message)
 end
 
 local function component(parent)
+    local parentOrigin = parent and parent.xyGlobal or { x = 0, y = 0 }
     local result = {
         x = 0,
         y = 0,
         width = 0,
         height = 0,
+        xyGlobal = { x = parentOrigin.x, y = parentOrigin.y },
+        position = {
+            x = 0,
+            y = 0,
+            xParentPc = 0,
+            yParentPc = 0,
+            xSelfPc = 0,
+            ySelfPc = 0,
+        },
+        size = {
+            width = 0,
+            height = 0,
+            widthParentPc = 0,
+            heightParentPc = 0,
+        },
         children = {},
         subscriptions = {},
         hidden = false,
         parent = parent,
     }
-    function result:SetPos(x, y)
+    function result:SetPos(x, y, xParentPc, yParentPc, xSelfPc, ySelfPc)
+        self.position = {
+            x = x,
+            y = y,
+            xParentPc = xParentPc or 0,
+            yParentPc = yParentPc or 0,
+            xSelfPc = xSelfPc or 0,
+            ySelfPc = ySelfPc or 0,
+        }
         self.x = x
         self.y = y
+        local origin = self.parent and self.parent.xyGlobal or { x = 0, y = 0 }
+        self.xyGlobal = { x = origin.x + x, y = origin.y + y }
     end
     function result:SetSize(width, height, widthAnchor, heightAnchor)
+        self.size = {
+            width = width,
+            height = height,
+            widthParentPc = widthAnchor or 0,
+            heightParentPc = heightAnchor or 0,
+        }
         self.width = width + (widthAnchor or 0) * (self.parent and self.parent.width or 0)
         self.height = height + (heightAnchor or 0) * (self.parent and self.parent.height or 0)
     end
@@ -46,6 +78,21 @@ local root = component()
 root.width = 640
 root.height = 480
 root.interfaceID = 1
+root.xyGlobal = { x = 0, y = 0 }
+local nativeHitbox = component(root)
+nativeHitbox:SetPos(240, 90, 0.25, 0.125, -0.5, -0.25)
+nativeHitbox:SetSize(160, 90, 0.1, 0.2)
+nativeHitbox.clickthrough = false
+local nativeHitboxPosition = nativeHitbox.position
+local nativeHitboxSize = nativeHitbox.size
+local nativeSubmenuLayer = component(root)
+nativeSubmenuLayer:SetPos(250, 95, 0.1, 0.1, 0, 0)
+nativeSubmenuLayer:SetSize(120, 70, 0.05, 0.05)
+nativeSubmenuLayer.clickthrough = true
+local nativeSubmenuPosition = nativeSubmenuLayer.position
+local nativeSubmenuSize = nativeSubmenuLayer.size
+
+
 
 ui = {
     AlignMode = { TOPLEFT = 1, CENTRE = 2 },
@@ -61,7 +108,19 @@ ui = {
     Sprite = { new = function(parent) return component(parent) end },
     Text = { new = function(parent) return component(parent) end },
     Interfaces = {
-        GetComponent = function() return root end,
+        GetComponent = function(_, componentID)
+            if componentID == id.Component.MINIMENU__MENU_BLOCKING_LAYER then
+                return nativeHitbox
+            end
+            if componentID == id.Component.MINIMENU__SUBMENU_LAYER then
+                return nativeSubmenuLayer
+            end
+            if componentID == id.Component.TOPLEVEL_V2__ROOT
+                    or componentID == id.Component.TOPLEVEL_V2__GAME_AREA then
+                return root
+            end
+            return nil
+        end,
         GetInterface = function(_, interfaceID)
             if interfaceID == root.interfaceID then return {} end
             return nil
@@ -70,11 +129,27 @@ ui = {
 }
 
 id = {
-    Component = { TOPLEVEL_V2__ROOT = 1, TOPLEVEL_V2__GAME_AREA = 2 },
+    Component = {
+        TOPLEVEL_V2__ROOT = 1,
+        TOPLEVEL_V2__GAME_AREA = 2,
+        MINIMENU__PC_MOUSE_LEAVE_LAYER = 3,
+        MINIMENU__MENU_BLOCKING_LAYER = 4,
+        MINIMENU__SUBMENU_LAYER = 5,
+    },
     Font = {
         NOTOSANS_BOLD_12 = 1,
     },
 }
+
+local diagnosticMessages = {}
+log = function(message) diagnosticMessages[#diagnosticMessages + 1] = message end
+
+local function hasDiagnostic(fragment)
+    for _, message in ipairs(diagnosticMessages) do
+        if message:find(fragment, 1, true) ~= nil then return true end
+    end
+    return false
+end
 
 config = {
     Font = {
@@ -158,13 +233,27 @@ local function callback(componentValue, hook)
 end
 
 
-local function latestOverlay()
-    for index = #root.children, 1, -1 do
-        local child = root.children[index]
+local function latestOverlayIn(parent)
+    for index = #parent.children, 1, -1 do
+        local child = parent.children[index]
         if child.subscriptions[tostring(ui.Hook.ONSCROLLWHEEL) .. ":default"] ~= nil then
             return child
         end
+        local nested = latestOverlayIn(child)
+        if nested ~= nil then return nested end
     end
+end
+
+local function latestOverlay()
+    return latestOverlayIn(root)
+end
+
+local function overlayGlobalX(menuOverlay)
+    return menuOverlay.xyGlobal.x
+end
+
+local function overlayGlobalY(menuOverlay)
+    return menuOverlay.xyGlobal.y
 end
 
 
@@ -181,6 +270,7 @@ local parentEntry = PrettyMiniMenu.AddSubmenu(menu, "PrettyUI actions", {
     { label = "Second child", action = function() selected = "second" end },
 }, {
     parentAction = function() selected = "parent" end,
+    diagnostics = true,
 })
 expect(parentEntry, menu.entries[2], "default placement returns the custom parent entry")
 expect(menu.entries[1].fullText, "Cancel",
@@ -237,6 +327,15 @@ expect(validPosition, false, "submenu placement rejects the reserved highest-pri
 expect(positionError:find("position", 1, true) ~= nil, true,
     "invalid placement identifies the position option")
 
+local validDiagnostics, diagnosticsError = pcall(function()
+    PrettyMiniMenu.AddSubmenu(newMenu(), "Invalid diagnostics", {
+        { label = "Child", action = function() end },
+    }, { diagnostics = "yes" })
+end)
+expect(validDiagnostics, false, "submenu diagnostics rejects non-boolean values")
+expect(diagnosticsError:find("diagnostics", 1, true) ~= nil, true,
+    "invalid diagnostics identifies the option")
+
 local openedMenu = {
     entries = {
         { fullText = menu.entries[1].fullText },
@@ -264,41 +363,74 @@ expect(rightOverlay.children[10].font, id.Font.NOTOSANS_BOLD_12,
     "submenu title uses the native bold 12px menu font")
 expect(rightOverlay.children[10].rgba, 0xDBCBA6FF,
     "submenu title uses the current native MiniMenu foreground colour")
-expect(rightOverlay.x > mouse.x, true, "the submenu uses available space on the right")
+local rightOverlayX = overlayGlobalX(rightOverlay)
+local rightOverlayY = overlayGlobalY(rightOverlay)
+expect(rightOverlay.parent, nativeHitbox,
+    "the custom submenu is hosted above its extended native menu blocker")
+expect(rightOverlay.x, rightOverlayX - nativeHitbox.x,
+    "a native-hosted submenu uses blocker-relative coordinates")
+expect(rightOverlayX > mouse.x, true, "the submenu uses available space on the right")
 local expectedNativeWidth = #"PrettyUI actions " * 8 + 8
-expect(rightOverlay.x, math.floor(mouse.x - expectedNativeWidth / 2) + expectedNativeWidth,
+expect(rightOverlayX, math.floor(mouse.x - expectedNativeWidth / 2) + expectedNativeWidth,
     "submenu placement uses native-menu metrics instead of the custom submenu font")
-mouse.x = rightOverlay.x + rightOverlay.width + 1
-mouse.y = rightOverlay.y + 30
+expect(nativeHitbox.width >= rightOverlayX + rightOverlay.width - nativeHitbox.x, true,
+    "opening a submenu extends the loaded native menu blocking layer over its width")
+expect(nativeHitbox.height >= rightOverlayY + rightOverlay.height - nativeHitbox.y, true,
+    "opening a submenu extends the loaded native menu blocking layer over its height")
+expect(nativeHitbox.clickthrough, false,
+    "native hosting leaves the menu blocker input behavior unchanged")
+expect(hasDiagnostic("opened mouseGlobal="), true,
+    "diagnostics report native menu geometry")
+expect(hasDiagnostic("using MENU_BLOCKING_LAYER as native hover bounds"), true,
+    "diagnostics report fallback to the loaded native menu blocking layer")
+expect(hasDiagnostic("hitbox immediately after extension"), true,
+    "diagnostics report the immediate hitbox mutation")
+emit("Logic")
+expect(hasDiagnostic("hitbox on next logic"), true,
+    "diagnostics report whether the native hitbox mutation survived a logic cycle")
+mouse.x = rightOverlayX + rightOverlay.width + 1
+mouse.y = rightOverlayY + 30
 emit("Logic")
 expect(rightOverlay.destroyed, true,
     "leaving both native and submenu bounds closes the submenu")
-mouse.x = rightOverlay.x - 5
+expect(nativeHitbox.position.x, nativeHitboxPosition.x,
+    "closing the submenu restores the native mouse-leave layer x offset")
+expect(nativeHitbox.position.xParentPc, nativeHitboxPosition.xParentPc,
+    "closing the submenu restores the native mouse-leave layer position anchors")
+expect(nativeHitbox.size.width, nativeHitboxSize.width,
+    "closing the submenu restores the native mouse-leave layer width offset")
+expect(nativeHitbox.size.widthParentPc, nativeHitboxSize.widthParentPc,
+    "closing the submenu restores the native mouse-leave layer size anchors")
+expect(nativeHitbox.clickthrough, false,
+    "closing the submenu restores native blocking input behavior")
+expect(hasDiagnostic("hitbox restored"), true,
+    "diagnostics report native hitbox restoration")
+expect(nativeSubmenuLayer.position.x, nativeSubmenuPosition.x,
+    "opening the custom submenu does not move the inactive native submenu layer")
+expect(nativeSubmenuLayer.size.width, nativeSubmenuSize.width,
+    "opening the custom submenu does not resize the inactive native submenu layer")
+expect(hasDiagnostic("custom submenu hosted in MENU_BLOCKING_LAYER"), true,
+    "diagnostics report blocker-local submenu hosting")
+mouse.x = rightOverlayX - 5
 mouse.y = 144
 emit("Logic")
 rightOverlay = latestOverlay()
 expect(rightOverlay.destroyed == true, false,
     "returning to the parent row can reopen the submenu while the native menu is open")
-mouse.x = rightOverlay.x + 5
-mouse.y = rightOverlay.y + 30
+mouse.x = overlayGlobalX(rightOverlay) + 5
+mouse.y = overlayGlobalY(rightOverlay) + 30
 emit("Logic")
-local childCountAfterOpen = #root.children
-nativeMenuOpen = false
-emit("MiniMenuClosed", { miniMenu = openedMenu })
-emit("Logic")
-expect(rightOverlay.destroyed == true, false,
-    "crossing into the submenu survives the native menu closing")
 
-expect(#root.children, childCountAfterOpen,
-    "native close does not add an input-capturing dismiss component")
 local row = firstRow(rightOverlay)
-expect(row ~= nil, true, "the first child row is interactive")
+expect(row ~= nil, true, "the first child row is interactive while the native menu is open")
 expect(row.x, 0, "child hover rows extend beneath the native side sprites")
 expect(row.children[2].font, id.Font.NOTOSANS_BOLD_12,
     "submenu entries use the native bold 12px menu font")
 expect(row.children[2].rgba, 0xDBCBA6FF,
     "submenu entries use the current native MiniMenu foreground colour")
 callback(row, ui.Hook.ONMOUSEOVER)()
+expect(hasDiagnostic("child mouseover"), true,
+    "diagnostics report whether submenu rows receive pointer events")
 expect(row.children[1].rgba, 0x3D3D3DFF,
     "submenu hover uses the current native MiniMenu background colour")
 expect(row.children[2].rgba, 0xEEE5C6FF,
@@ -307,6 +439,22 @@ callback(row, ui.Hook.ONMOUSELEAVE)()
 callback(row, ui.Hook.ONCLICK)()
 expect(selected, "first", "child actions receive their attached arguments")
 expect(rightOverlay.destroyed, true, "selecting a child destroys the submenu")
+
+nativeMenuOpen = true
+mouse.x = 320
+mouse.y = 100
+emit("MiniMenuOpened", { miniMenu = openedMenu })
+mouse.y = 144
+emit("Logic")
+local nativeClosedOverlay = latestOverlay()
+expect(nativeClosedOverlay.destroyed == true, false,
+    "the submenu can reopen before native close")
+nativeMenuOpen = false
+emit("MiniMenuClosed", { miniMenu = openedMenu })
+expect(hasDiagnostic("native MiniMenuClosed event"), true,
+    "diagnostics report premature native menu closure")
+expect(nativeClosedOverlay.destroyed, true,
+    "native close destroys a submenu hosted in the native interface")
 
 
 
@@ -323,22 +471,18 @@ emit("MiniMenuOpened", { miniMenu = menu })
 mouse.y = 144
 emit("Logic")
 local leftOverlay = latestOverlay()
-expect(leftOverlay.x + leftOverlay.width <= 285, true,
+local leftOverlayX = overlayGlobalX(leftOverlay)
+local leftOverlayY = overlayGlobalY(leftOverlay)
+expect(leftOverlayX + leftOverlay.width <= 285, true,
     "a submenu flips left when the right viewport edge has insufficient space")
-expect(leftOverlay.x >= 0, true, "left-opening submenus remain inside the viewport")
-expect(leftOverlay.y >= 0 and leftOverlay.y + leftOverlay.height <= root.height, true,
+expect(leftOverlayX >= 0, true, "left-opening submenus remain inside the viewport")
+expect(leftOverlayY >= 0 and leftOverlayY + leftOverlay.height <= root.height, true,
     "submenus remain inside vertical viewport bounds")
 
 nativeMenuOpen = false
 emit("MiniMenuClosed", { miniMenu = menu })
-emit("Logic")
-expect(leftOverlay.destroyed == true, false,
-    "the submenu remains while the cursor is inside the former native menu bounds")
-mouse.x = 0
-mouse.y = 0
-emit("Logic")
 expect(leftOverlay.destroyed, true,
-    "leaving both native and submenu bounds closes after the native menu closes")
+    "native close destroys the hosted submenu")
 
 root.width = 320
 root.height = 80
