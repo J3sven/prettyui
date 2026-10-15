@@ -4,3 +4,4 @@ PrettyUI is a UI library that helps craft native-looking interfaces for your plu
 
 ## Useful resources
 - [Documentation](https://prettyui.j3.gg/)
+- [Visual Editor](https://prettyui.j3.gg/editor.html)
