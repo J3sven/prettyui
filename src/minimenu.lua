@@ -29,95 +29,8 @@ local NOOP = function() end
 local started = false
 local activeMenu = nil
 local overlay = nil
-local parentsByEntry = setmetatable({}, { __mode = "k" })
+local parentsByEntry = {}
 local parentsByText = {}
-
-local function diagnostic(registration, message)
-    if registration == nil or registration.diagnostics ~= true
-            or type(log) ~= "function" then return end
-    log("[PrettyUI MiniMenu] " .. message)
-end
-
-local function componentDescription(name, componentID)
-    if componentID == nil then return name .. ": ID unavailable" end
-    local retrieved, component = pcall(function()
-        return ui.Interfaces:GetComponent(componentID)
-    end)
-    if not retrieved then
-        return name .. ": lookup failed: " .. tostring(component)
-    end
-    if component == nil then return name .. ": not loaded" end
-    local described, description = pcall(function()
-        local origin = component.xyGlobal or { x = "?", y = "?" }
-        return name
-            .. " id=" .. tostring(componentID)
-            .. " staticID=" .. tostring(component.staticID)
-            .. " global=(" .. tostring(origin.x) .. "," .. tostring(origin.y) .. ")"
-            .. " local=(" .. tostring(component.x) .. "," .. tostring(component.y) .. ")"
-            .. " size=(" .. tostring(component.width) .. "," .. tostring(component.height) .. ")"
-            .. " enabled=" .. tostring(component.enabled)
-            .. " visible=" .. tostring(component.visibleGlobal)
-            .. " clickthrough=" .. tostring(component.clickthrough)
-            .. " mouseOver=" .. tostring(component.isMouseOver)
-            .. " restricted=" .. tostring(component.isRestricted)
-    end)
-    if described then return description end
-    return name .. ": inspection failed: " .. tostring(description)
-end
-
-local function dumpNativeLayers(registration)
-    local componentIDs = id.Component
-    local components = {
-        { "CLICKOUT_AND_BLOCKING_LAYER", componentIDs.MINIMENU__CLICKOUT_AND_BLOCKING_LAYER },
-        { "PC_MOUSE_LEAVE_LAYER", componentIDs.MINIMENU__PC_MOUSE_LEAVE_LAYER },
-        { "SUBMENU_BLOCKING_LAYER", componentIDs.MINIMENU__SUBMENU_BLOCKING_LAYER },
-        { "MENU_BLOCKING_LAYER", componentIDs.MINIMENU__MENU_BLOCKING_LAYER },
-        { "MENU_LAYER", componentIDs.MINIMENU__MENU_LAYER },
-        { "SUBMENU_LAYER", componentIDs.MINIMENU__SUBMENU_LAYER },
-    }
-    for _, component in ipairs(components) do
-        diagnostic(registration, componentDescription(component[1], component[2]))
-    end
-end
-
-local function nativeHitboxDescription(nativeHitbox)
-    local described, description = pcall(function()
-        local component = nativeHitbox.component
-        local origin = component.xyGlobal or { x = "?", y = "?" }
-        local retained = origin.x == nativeHitbox.expectedX
-            and origin.y == nativeHitbox.expectedY
-            and component.width == nativeHitbox.expectedWidth
-            and component.height == nativeHitbox.expectedHeight
-        return "component=" .. nativeHitbox.componentName
-            .. " global=(" .. tostring(origin.x) .. "," .. tostring(origin.y) .. ")"
-            .. " size=(" .. tostring(component.width) .. "," .. tostring(component.height) .. ")"
-            .. " expected=(" .. tostring(nativeHitbox.expectedX)
-            .. "," .. tostring(nativeHitbox.expectedY)
-            .. "," .. tostring(nativeHitbox.expectedWidth)
-            .. "," .. tostring(nativeHitbox.expectedHeight) .. ")"
-            .. " retained=" .. tostring(retained)
-            .. " clickthrough=" .. tostring(component.clickthrough)
-            .. " originalClickthrough=" .. tostring(nativeHitbox.clickthrough)
-            .. " mouseOver=" .. tostring(component.isMouseOver)
-    end)
-    if described then return description end
-    return "inspection failed: " .. tostring(description)
-end
-
-local function diagnosticRegistrations(registrations, message)
-    for _, registration in pairs(registrations) do
-        diagnostic(registration, message)
-    end
-end
-
-local function verifyNativeMouseLeaveLayer(menuOverlay, phase)
-    local nativeHitbox = menuOverlay and menuOverlay.nativeHitbox
-    if nativeHitbox == nil then return end
-    diagnostic(menuOverlay.registration,
-        "hitbox " .. phase .. " " .. nativeHitboxDescription(nativeHitbox))
-end
-
-
 
 local function sprite(parent, spriteID)
     local component = ui.Sprite.new(parent)
@@ -126,8 +39,14 @@ local function sprite(parent, spriteID)
     return component
 end
 
+local function plainTag(tag)
+    if tag == "gt" then return ">" end
+    if tag == "lt" then return "<" end
+    return ""
+end
+
 local function plainText(value)
-    return tostring(value or ""):gsub("<gt>", ">"):gsub("<lt>", "<"):gsub("<[^>]*>", "")
+    return tostring(value or ""):gsub("<([^>]*)>", plainTag)
 end
 
 local function textKey(value)
@@ -207,180 +126,105 @@ local function frame(root, width, height)
 end
 
 local function nativeComponent(componentID)
-    if componentID == nil then return nil, "component ID unavailable" end
-    local succeeded, component = pcall(function()
-        return ui.Interfaces:GetComponent(componentID)
-    end)
-    if not succeeded then return nil, "lookup failed: " .. tostring(component) end
-    if component == nil then return nil, "component not loaded" end
-    return component
+    if componentID == nil then return nil end
+    return ui.Interfaces:GetComponent(componentID)
 end
 
 local function nativeMouseLeaveLayer()
-    local candidates = {
-        {
-            name = "PC_MOUSE_LEAVE_LAYER",
-            id = id.Component.MINIMENU__PC_MOUSE_LEAVE_LAYER,
-        },
-        {
-            name = "MENU_BLOCKING_LAYER",
-            id = id.Component.MINIMENU__MENU_BLOCKING_LAYER,
-        },
-    }
-    local failures = {}
-    for _, candidate in ipairs(candidates) do
-        local component, failure = nativeComponent(candidate.id)
-        if component ~= nil then return component, candidate.name, candidate.id end
-        failures[#failures + 1] = candidate.name .. ": " .. tostring(failure)
-    end
-    return nil, table.concat(failures, "; ")
+    local componentID = id.Component.MINIMENU__PC_MOUSE_LEAVE_LAYER
+    local component = nativeComponent(componentID)
+    if component ~= nil then return component, componentID end
+    componentID = id.Component.MINIMENU__MENU_BLOCKING_LAYER
+    return nativeComponent(componentID), componentID
 end
 
 local function restoreNativeMouseLeaveLayer(menuOverlay)
     local nativeHitbox = menuOverlay.nativeHitbox
     if nativeHitbox == nil then return end
     menuOverlay.nativeHitbox = nil
-    if nativeComponent(nativeHitbox.componentID) ~= nativeHitbox.component then
-        diagnostic(menuOverlay.registration,
-            "hitbox restore skipped because " .. nativeHitbox.componentName
-            .. " is no longer loaded")
-        return
-    end
-    local succeeded, failure = pcall(function()
-        local position = nativeHitbox.position
-        local size = nativeHitbox.size
-        nativeHitbox.component:SetPos(
-            position.x,
-            position.y,
-            position.xParentPc,
-            position.yParentPc,
-            position.xSelfPc,
-            position.ySelfPc)
-        nativeHitbox.component:SetSize(
-            size.width,
-            size.height,
-            size.widthParentPc,
-            size.heightParentPc)
-        nativeHitbox.component.clickthrough = nativeHitbox.clickthrough
-    end)
-    if succeeded then
-        diagnostic(menuOverlay.registration,
-            "hitbox restored " .. nativeHitboxDescription(nativeHitbox))
-    else
-        diagnostic(menuOverlay.registration, "hitbox restore failed: " .. tostring(failure))
-    end
+    if nativeComponent(nativeHitbox.componentID) ~= nativeHitbox.component then return end
+    local position = nativeHitbox.position
+    local size = nativeHitbox.size
+    nativeHitbox.component:SetPos(
+        position.x,
+        position.y,
+        position.xParentPc,
+        position.yParentPc,
+        position.xSelfPc,
+        position.ySelfPc)
+    nativeHitbox.component:SetSize(
+        size.width,
+        size.height,
+        size.widthParentPc,
+        size.heightParentPc)
 end
 
 local function extendNativeMouseLeaveLayer(menuOverlay, state)
-    dumpNativeLayers(menuOverlay.registration)
-    local component, componentName, componentID = nativeMouseLeaveLayer()
-    if component == nil then
-        diagnostic(menuOverlay.registration,
-            "hitbox extension unavailable: " .. tostring(componentName))
-        return
-    end
-    diagnostic(menuOverlay.registration, "using " .. componentName .. " as native hover bounds")
+    local component, componentID = nativeMouseLeaveLayer()
+    if component == nil or component.width <= 0 or component.height <= 0 then return end
 
-    local succeeded, nativeHitbox = pcall(function()
-        assert(component.width > 0 and component.height > 0,
-            "native mouse-leave layer has zero bounds")
-        local position = component.position
-        local size = component.size
-        local componentOrigin = component.xyGlobal
-        local componentParentOrigin = component.parent and component.parent.xyGlobal
-            or { x = 0, y = 0 }
-        local viewportOrigin = state.parent.xyGlobal or { x = 0, y = 0 }
-        return {
-            component = component,
-            componentName = componentName,
-            componentID = componentID,
-            clickthrough = component.clickthrough,
-            position = {
-                x = position.x,
-                y = position.y,
-                xParentPc = position.xParentPc,
-                yParentPc = position.yParentPc,
-                xSelfPc = position.xSelfPc,
-                ySelfPc = position.ySelfPc,
-            },
-            size = {
-                width = size.width,
-                height = size.height,
-                widthParentPc = size.widthParentPc,
-                heightParentPc = size.heightParentPc,
-            },
-            globalX = componentOrigin.x,
-            globalY = componentOrigin.y,
-            parentGlobalX = componentParentOrigin.x,
-            parentGlobalY = componentParentOrigin.y,
-            submenuGlobalX = viewportOrigin.x + menuOverlay.x,
-            submenuGlobalY = viewportOrigin.y + menuOverlay.y,
-        }
-    end)
-    if not succeeded or nativeHitbox == nil then
-        diagnostic(menuOverlay.registration,
-            "hitbox snapshot failed: " .. tostring(nativeHitbox))
-        return
-    end
-
-    menuOverlay.nativeHitbox = nativeHitbox
-    local left = math.min(
-        nativeHitbox.globalX,
-        nativeHitbox.submenuGlobalX - NATIVE_HITBOX_PADDING)
-    local top = math.min(
-        nativeHitbox.globalY,
-        nativeHitbox.submenuGlobalY - NATIVE_HITBOX_PADDING)
+    local position = component.position
+    local size = component.size
+    local componentOrigin = component.xyGlobal
+    local parentOrigin = component.parent and component.parent.xyGlobal or { x = 0, y = 0 }
+    local viewportOrigin = state.parent.xyGlobal or { x = 0, y = 0 }
+    local submenuX = viewportOrigin.x + menuOverlay.x
+    local submenuY = viewportOrigin.y + menuOverlay.y
+    -- The native menu otherwise closes when the pointer enters our submenu.
+    -- Copy layout offsets and anchors before changing either native dimension.
+    menuOverlay.nativeHitbox = {
+        component = component,
+        componentID = componentID,
+        position = {
+            x = position.x,
+            y = position.y,
+            xParentPc = position.xParentPc,
+            yParentPc = position.yParentPc,
+            xSelfPc = position.xSelfPc,
+            ySelfPc = position.ySelfPc,
+        },
+        size = {
+            width = size.width,
+            height = size.height,
+            widthParentPc = size.widthParentPc,
+            heightParentPc = size.heightParentPc,
+        },
+    }
+    local left = math.min(componentOrigin.x, submenuX - NATIVE_HITBOX_PADDING)
+    local top = math.min(componentOrigin.y, submenuY - NATIVE_HITBOX_PADDING)
     local right = math.max(
-        nativeHitbox.globalX + component.width,
-        nativeHitbox.submenuGlobalX + menuOverlay.width + NATIVE_HITBOX_PADDING)
+        componentOrigin.x + component.width,
+        submenuX + menuOverlay.width + NATIVE_HITBOX_PADDING)
     local bottom = math.max(
-        nativeHitbox.globalY + component.height,
-        nativeHitbox.submenuGlobalY + menuOverlay.height + NATIVE_HITBOX_PADDING)
-    nativeHitbox.expectedX = left
-    nativeHitbox.expectedY = top
-    nativeHitbox.expectedWidth = right - left
-    nativeHitbox.expectedHeight = bottom - top
-    diagnostic(menuOverlay.registration,
-        "hitbox before global=(" .. tostring(nativeHitbox.globalX)
-        .. "," .. tostring(nativeHitbox.globalY)
-        .. ") size=(" .. tostring(component.width)
-        .. "," .. tostring(component.height)
-        .. "); submenu global=(" .. tostring(nativeHitbox.submenuGlobalX)
-        .. "," .. tostring(nativeHitbox.submenuGlobalY)
-        .. ") size=(" .. tostring(menuOverlay.width)
-        .. "," .. tostring(menuOverlay.height) .. ")")
-    local failure
-    succeeded, failure = pcall(function()
-        component:SetPos(
-            left - nativeHitbox.parentGlobalX,
-            top - nativeHitbox.parentGlobalY)
-        component:SetSize(right - left, bottom - top)
-    end)
-    if succeeded then
-        diagnostic(menuOverlay.registration,
-            "hitbox immediately after extension " .. nativeHitboxDescription(nativeHitbox))
-    else
-        diagnostic(menuOverlay.registration, "hitbox extension failed: " .. tostring(failure))
-        restoreNativeMouseLeaveLayer(menuOverlay)
-    end
+        componentOrigin.y + component.height,
+        submenuY + menuOverlay.height + NATIVE_HITBOX_PADDING)
+    component:SetPos(left - parentOrigin.x, top - parentOrigin.y)
+    component:SetSize(right - left, bottom - top)
 end
 
-
-
-
+local function releaseOverlay(menuOverlay)
+    local root = menuOverlay.root
+    menuOverlay.root = nil
+    local destroyed, failure = true, nil
+    if root ~= nil and ui.Interfaces:GetInterface(menuOverlay.interfaceID) ~= nil then
+        destroyed, failure = pcall(root.Destroy, root)
+    end
+    -- Restore native bounds even if destroying a plugin component fails.
+    restoreNativeMouseLeaveLayer(menuOverlay)
+    if not destroyed then error(failure, 0) end
+end
 
 local function destroyOverlay()
-    if overlay == nil then return end
-    if ui.Interfaces:GetInterface(overlay.interfaceID) ~= nil and overlay.root ~= nil then
-        overlay.root:Destroy()
-    end
-    restoreNativeMouseLeaveLayer(overlay)
+    local previous = overlay
     overlay = nil
+    if previous ~= nil then releaseOverlay(previous) end
 end
 
 local function reset()
-    destroyOverlay()
     activeMenu = nil
+    parentsByEntry = {}
+    parentsByText = {}
+    destroyOverlay()
 end
 
 local function setRowHovered(row, hovered)
@@ -434,72 +278,31 @@ local function submenuWidth(registration)
     return math.max(MINIMUM_WIDTH, math.ceil(width) + MENU_WIDTH_PADDING)
 end
 
-local function createOverlay(registration, parentRow)
-    destroyOverlay()
-
-    local state = activeMenu
-    local width = math.min(submenuWidth(registration), state.viewportWidth)
-    local maximumRows = math.max(1,
-        math.floor((state.viewportHeight - HEADER_HEIGHT - BOTTOM_PADDING) / ITEM_HEIGHT))
-    local visibleRows = math.min(#registration.children, maximumRows)
-    local height = math.max(46, HEADER_HEIGHT + visibleRows * ITEM_HEIGHT + BOTTOM_PADDING)
-
-    local rightX = state.rootX + state.rootWidth
-    local leftX = state.rootX - width
-    local rightSpace = state.viewportWidth - rightX
-    local leftSpace = state.rootX
-    local x
-    if rightSpace >= width then
-        x = rightX
-    elseif leftSpace >= width then
-        x = leftX
-    elseif rightSpace >= leftSpace then
-        x = clamp(rightX, 0, state.viewportWidth - width)
-    else
-        x = clamp(leftX, 0, state.viewportWidth - width)
-    end
-
-    local parentRowTop = state.rootY + HEADER_HEIGHT + parentRow * ITEM_HEIGHT
-    local y = clamp(parentRowTop - HEADER_HEIGHT, 0, state.viewportHeight - height)
-    diagnostic(registration,
-        "submenu created side=" .. (x >= rightX and "right" or "left")
-        .. " local=(" .. tostring(x) .. "," .. tostring(y)
-        .. ") size=(" .. tostring(width) .. "," .. tostring(height)
-        .. ") parentRow=" .. tostring(parentRow))
-
-    local menuOverlay = {
-        registration = registration,
-        x = x,
-        y = y,
-        width = width,
-        height = height,
-        visibleRows = visibleRows,
-        scrollOffset = 0,
-        rows = {},
-    }
+local function mountOverlay(menuOverlay, state)
+    local registration = menuOverlay.registration
+    local x, y = menuOverlay.x, menuOverlay.y
+    local width, height = menuOverlay.width, menuOverlay.height
     extendNativeMouseLeaveLayer(menuOverlay, state)
 
     local rootParent = state.parent
     local rootX, rootY = x, y
     if menuOverlay.nativeHitbox ~= nil
-            and menuOverlay.nativeHitbox.componentName == "MENU_BLOCKING_LAYER" then
+            and menuOverlay.nativeHitbox.componentID == id.Component.MINIMENU__MENU_BLOCKING_LAYER then
+        -- A top-level sibling would render and receive input below this blocker.
+        -- Hosting inside it also requires converting viewport to blocker-local coordinates.
         rootParent = menuOverlay.nativeHitbox.component
         local hostOrigin = rootParent.xyGlobal or { x = 0, y = 0 }
         local viewportOrigin = state.parent.xyGlobal or { x = 0, y = 0 }
         rootX = viewportOrigin.x + x - hostOrigin.x
         rootY = viewportOrigin.y + y - hostOrigin.y
-        menuOverlay.hostedNative = true
-        diagnostic(registration,
-            "custom submenu hosted in MENU_BLOCKING_LAYER local=("
-            .. tostring(rootX) .. "," .. tostring(rootY) .. ")")
     end
 
+    menuOverlay.interfaceID = rootParent.interfaceID
     local root = ui.Layer.new(rootParent)
+    menuOverlay.root = root
     root:SetPos(rootX, rootY)
     root:SetSize(width, height)
     root.clickthrough = true
-    menuOverlay.root = root
-    menuOverlay.interfaceID = root.interfaceID or state.interfaceID
     local frameEdges = frame(root, width, height)
 
     local title = ui.Text.new(root)
@@ -514,7 +317,7 @@ local function createOverlay(registration, parentRow)
     title.isShadowed = false
     title.clickthrough = true
 
-    for rowIndex = 1, visibleRows do
+    for rowIndex = 1, menuOverlay.visibleRows do
         local rowRoot = ui.Layer.new(root)
         rowRoot:SetPos(0, HEADER_HEIGHT + (rowIndex - 1) * ITEM_HEIGHT)
         rowRoot:SetSize(width, ITEM_HEIGHT)
@@ -542,10 +345,6 @@ local function createOverlay(registration, parentRow)
         menuOverlay.rows[rowIndex] = row
         rowRoot:Subscribe(ui.Hook.ONMOUSEOVER, function()
             setRowHovered(row, true)
-            local child = menuOverlay.registration.children[row.childIndex]
-            diagnostic(menuOverlay.registration,
-                "child mouseover index=" .. tostring(row.childIndex)
-                .. " label=" .. tostring(child and child.label))
             return false
         end)
         rowRoot:Subscribe(ui.Hook.ONMOUSEREPEAT, function()
@@ -557,8 +356,6 @@ local function createOverlay(registration, parentRow)
             return false
         end)
         rowRoot:Subscribe(ui.Hook.ONCLICK, function()
-            diagnostic(menuOverlay.registration,
-                "child click index=" .. tostring(row.childIndex))
             return selectChild(menuOverlay, row)
         end)
         rowRoot:Subscribe(ui.Hook.ONSCROLLWHEEL, function(_, delta)
@@ -573,9 +370,60 @@ local function createOverlay(registration, parentRow)
     end)
     refreshRows(menuOverlay)
     root:MoveToFront()
+end
+
+local function createOverlay(registration, parentRow)
+    destroyOverlay()
+
+    local state = activeMenu
+    local width = math.min(submenuWidth(registration), state.viewportWidth)
+    local maximumRows = math.max(1,
+        math.floor((state.viewportHeight - HEADER_HEIGHT - BOTTOM_PADDING) / ITEM_HEIGHT))
+    local visibleRows = math.min(#registration.children, maximumRows)
+    local height = math.max(46, HEADER_HEIGHT + visibleRows * ITEM_HEIGHT + BOTTOM_PADDING)
+
+    local rightX = state.rootX + state.rootWidth
+    local leftX = state.rootX - width
+    local rightSpace = state.viewportWidth - rightX
+    local leftSpace = state.rootX
+    local x
+    if rightSpace >= width then
+        x = rightX
+    elseif leftSpace >= width then
+        x = leftX
+    elseif rightSpace >= leftSpace then
+        x = clamp(rightX, 0, state.viewportWidth - width)
+    else
+        x = clamp(leftX, 0, state.viewportWidth - width)
+    end
+
+    local parentRowTop = state.rootY + HEADER_HEIGHT + parentRow * ITEM_HEIGHT
+    local y = clamp(parentRowTop - HEADER_HEIGHT, 0, state.viewportHeight - height)
+    local menuOverlay = {
+        registration = registration,
+        x = x,
+        y = y,
+        width = width,
+        height = height,
+        visibleRows = visibleRows,
+        scrollOffset = 0,
+        rows = {},
+    }
+    local mounted, failure = pcall(mountOverlay, menuOverlay, state)
+    if not mounted then
+        activeMenu = nil
+        local released, releaseFailure = pcall(releaseOverlay, menuOverlay)
+        if not released then
+            error(tostring(failure) .. "; submenu cleanup failed: " .. tostring(releaseFailure), 0)
+        end
+        error(failure, 0)
+    end
     overlay = menuOverlay
 end
 
+-- MiniMenuOpened exposes entries, not a stable native menu rectangle. Match the
+-- native font, chrome metrics and mouse-centred placement; the custom rows use
+-- their own font. Native entry order is reversed when mapping displayed rows.
 local function menuDimensions(entries, viewportHeight)
     local width = measureNativeText("Choose Option")
     for _, entry in ipairs(entries) do
@@ -590,13 +438,21 @@ local function menuDimensions(entries, viewportHeight)
 end
 
 local function onOpened(event)
+    local byEntry, byText = parentsByEntry, parentsByText
     reset()
     local entries = event.miniMenu.entries
     local registrations = {}
+    local fallbackIndices = {}
     for index, entry in ipairs(entries) do
-        local registration = parentsByEntry[entry]
-            or parentsByText[textKey(entryText(entry))]
-        if registration ~= nil then registrations[index] = registration end
+        registrations[index] = byEntry[entry]
+        local key = textKey(entryText(entry))
+        if byText[key] ~= nil then
+            fallbackIndices[key] = fallbackIndices[key] == nil and index or false
+        end
+    end
+    -- Open-time wrappers may be new. Only use text when exactly one entry matches.
+    for key, index in pairs(fallbackIndices) do
+        if index then registrations[index] = registrations[index] or byText[key] end
     end
     if next(registrations) == nil then return end
 
@@ -604,8 +460,6 @@ local function onOpened(event)
         or ui.Interfaces:GetComponent(id.Component.TOPLEVEL_V2__GAME_AREA)
     local mouse = InterfaceMouse.GetPosition()
     if parent == nil or mouse == nil or parent.width <= 0 or parent.height <= 0 then
-        diagnosticRegistrations(registrations,
-            "open aborted: viewport parent or mouse position unavailable")
         return
     end
 
@@ -618,7 +472,7 @@ local function onOpened(event)
     activeMenu = {
         parent = parent,
         interfaceID = parent.interfaceID,
-        entries = entries,
+        entryCount = #entries,
         registrations = registrations,
         viewportWidth = parent.width,
         viewportHeight = parent.height,
@@ -628,46 +482,16 @@ local function onOpened(event)
         rootX = clamp(math.floor(mouseX - width / 2), 0, parent.width - width),
         rootY = clamp(math.floor(mouseY), 0, parent.height - height),
     }
-    diagnosticRegistrations(registrations,
-        "opened mouseGlobal=(" .. tostring(mouse.x) .. "," .. tostring(mouse.y)
-        .. ") viewportGlobal=(" .. tostring(origin.x) .. "," .. tostring(origin.y)
-        .. ") viewportSize=(" .. tostring(parent.width) .. "," .. tostring(parent.height)
-        .. ") inferredNativeLocal=(" .. tostring(activeMenu.rootX)
-        .. "," .. tostring(activeMenu.rootY)
-        .. ") inferredNativeSize=(" .. tostring(width) .. "," .. tostring(height) .. ")")
 end
 
 local function inside(x, y, left, top, width, height)
     return x >= left and x < left + width and y >= top and y < top + height
 end
 
-
-local function onClosed()
-    if overlay ~= nil then
-        local mouse = InterfaceMouse.GetPosition()
-        diagnostic(overlay.registration,
-            "native MiniMenuClosed event mouseGlobal=("
-            .. tostring(mouse and mouse.x) .. "," .. tostring(mouse and mouse.y)
-            .. "); " .. (overlay.nativeHitbox
-                and nativeHitboxDescription(overlay.nativeHitbox)
-                or "native hitbox unavailable"))
-    end
-    if overlay == nil or activeMenu == nil or overlay.hostedNative
-            or ui.Interfaces:GetInterface(activeMenu.interfaceID) == nil then
-        reset()
-    end
-end
-
 local function onLogic()
     local state = activeMenu
     if state == nil then return end
-    if ui.Interfaces:GetInterface(state.interfaceID) == nil then
-        reset()
-        return
-    end
-
-    local nativeOpen = MiniMenu.IsOpen()
-    if not nativeOpen and overlay == nil then
+    if ui.Interfaces:GetInterface(state.interfaceID) == nil or not MiniMenu.IsOpen() then
         reset()
         return
     end
@@ -681,29 +505,12 @@ local function onLogic()
         x, y, state.rootX, state.rootY, state.rootWidth, state.rootHeight)
     local insideSubmenu = overlay ~= nil and inside(
         x, y, overlay.x, overlay.y, overlay.width, overlay.height)
-    if overlay ~= nil and overlay.nativeHitbox ~= nil
-            and overlay.nativeHitbox.logicChecked ~= true then
-        overlay.nativeHitbox.logicChecked = true
-        verifyNativeMouseLeaveLayer(overlay, "on next logic")
-    end
-
-
     if overlay ~= nil and not insideNative and not insideSubmenu then
-        diagnostic(overlay.registration,
-            "dismissed outside both bounds nativeOpen=" .. tostring(nativeOpen)
-            .. " mouseLocal=(" .. tostring(x) .. "," .. tostring(y)
-            .. ") insideNative=" .. tostring(insideNative)
-            .. " insideSubmenu=" .. tostring(insideSubmenu))
-        if nativeOpen then
-            destroyOverlay()
-        else
-            reset()
-        end
+        destroyOverlay()
         return
     end
 
-    if not nativeOpen or insideSubmenu then return end
-    if not insideNative then return end
+    if insideSubmenu or not insideNative then return end
 
     local contentY = y - state.rootY - HEADER_HEIGHT
     local row = math.floor(contentY / ITEM_HEIGHT)
@@ -712,15 +519,8 @@ local function onLogic()
         return
     end
 
-    local entryIndex = #state.entries - row
+    local entryIndex = state.entryCount - row
     local registration = state.registrations[entryIndex]
-    if registration ~= nil
-            and (overlay == nil or overlay.registration ~= registration) then
-        diagnostic(registration,
-            "parent hover row=" .. tostring(row)
-            .. " entryIndex=" .. tostring(entryIndex)
-            .. " mouseLocal=(" .. tostring(x) .. "," .. tostring(y) .. ")")
-    end
     if registration == nil then
         destroyOverlay()
     elseif overlay == nil or overlay.registration ~= registration then
@@ -760,8 +560,15 @@ local function moveEntry(miniMenu, currentIndex, targetIndex)
 end
 
 local function addParentEntry(miniMenu, label, action)
+    local key = textKey(label)
+    assert(parentsByText[key] == nil,
+        "MiniMenu submenu labels must be unique within the current menu")
     local existing = {}
-    for _, entry in ipairs(miniMenu.entries) do existing[entry] = true end
+    for _, entry in ipairs(miniMenu.entries) do
+        assert(textKey(entryText(entry)) ~= key,
+            "MiniMenu submenu label conflicts with an existing menu entry")
+        existing[entry] = true
+    end
     local previousCount = #miniMenu.entries
     miniMenu:Add(label, action)
     assert(#miniMenu.entries == previousCount + 1,
@@ -791,8 +598,6 @@ function PrettyMiniMenu.AddSubmenu(miniMenu, label, children, options)
     assert(type(options) == "table", "MiniMenu submenu options must be a table")
     assert(options.parentAction == nil or type(options.parentAction) == "function",
         "MiniMenu submenu parentAction must be a function")
-    assert(options.diagnostics == nil or type(options.diagnostics) == "boolean",
-        "MiniMenu submenu diagnostics must be a boolean")
     validatePosition(options.position)
     local parentLabel = label
     if options.arrow ~= false then parentLabel = parentLabel .. " <col=ffffff><gt></col>" end
@@ -807,8 +612,6 @@ function PrettyMiniMenu.AddSubmenu(miniMenu, label, children, options)
     local registration = {
         children = children,
         title = options.title,
-        label = label,
-        diagnostics = options.diagnostics == true,
     }
     parentsByEntry[entry] = registration
     parentsByText[textKey(parentLabel)] = registration
@@ -818,22 +621,25 @@ end
 function PrettyMiniMenu.Start()
     if started then return end
     started = true
+    -- Dependencies start before consumers subscribe, so each Ready event clears
+    -- the previous build before their AddSubmenu calls populate the next one.
+    Event.MiniMenuReady.Subscribe(EVENT_ID, reset)
     Event.MiniMenuOpened.Subscribe(EVENT_ID, onOpened)
-    Event.MiniMenuClosed.Subscribe(EVENT_ID, onClosed)
+    Event.MiniMenuClosed.Subscribe(EVENT_ID, reset)
     Event.MiniMenuEntrySelected.Subscribe(EVENT_ID, reset)
     Event.Logic.Subscribe(EVENT_ID, onLogic)
 end
 
 function PrettyMiniMenu.Shutdown()
-    if not started then return end
-    started = false
-    Event.MiniMenuOpened.Unsubscribe(EVENT_ID)
-    Event.MiniMenuClosed.Unsubscribe(EVENT_ID)
-    Event.MiniMenuEntrySelected.Unsubscribe(EVENT_ID)
-    Event.Logic.Unsubscribe(EVENT_ID)
+    if started then
+        started = false
+        Event.MiniMenuReady.Unsubscribe(EVENT_ID)
+        Event.MiniMenuOpened.Unsubscribe(EVENT_ID)
+        Event.MiniMenuClosed.Unsubscribe(EVENT_ID)
+        Event.MiniMenuEntrySelected.Unsubscribe(EVENT_ID)
+        Event.Logic.Unsubscribe(EVENT_ID)
+    end
     reset()
-    parentsByEntry = setmetatable({}, { __mode = "k" })
-    parentsByText = {}
 end
 
 return PrettyMiniMenu
