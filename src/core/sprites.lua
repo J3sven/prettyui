@@ -82,11 +82,11 @@ local Sprites = {
         content = id.Sprite.RS3_HUD_WINDOW_CONTENT_TILE,
     },
     MINIMENU = {
-        title = 2026,
-        titleCorner = 2027,
-        side = 2028,
-        bottom = 2029,
-        bottomCorner = 2030,
+        title = id.Sprite.RIGHTCLICK_TOPMID,
+        titleCorner = id.Sprite.RIGHTCLICK_TOPSIDE,
+        side = id.Sprite.RIGHTCLICK_MAINSIDE,
+        bottom = id.Sprite.RIGHTCLICK_MAINBOTTOM,
+        bottomCorner = id.Sprite.RIGHTCLICK_MAINCORNER,
     },
     ANCHORED_TOOLTIP = {
         border = {
