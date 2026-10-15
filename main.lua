@@ -8,6 +8,7 @@ local Histogram = require("src/histogram")
 local Dialog = require("src/dialog")
 local Confirm = require("src/confirm")
 local SelectionButtons = require("src/selection_button")
+local PrettyMiniMenu = require("src/minimenu")
 
 local resources = Plugin.resources
 TextField.SetDefaultSprite(resources and (resources.input_default or resources["input_default.png"]))
@@ -31,6 +32,7 @@ local PrettyUI = {
     ItemGrid = require("src/item_grid"),
     KeybindField = KeybindField,
     List = require("src/list"),
+    MiniMenu = PrettyMiniMenu,
     Panel = require("src/panel"),
     Sprites = require("src/core/sprites"),
     RibbonButton = require("src/ribbon_button"),
@@ -54,9 +56,11 @@ local PrettyUI = {
 PrettyUI.version = "1.1.0"
 
 RibbonBar.Start()
+PrettyMiniMenu.Start()
 
 function PluginShutdown()
     KeybindField.Shutdown()
+    PrettyMiniMenu.Shutdown()
     Dialog.Shutdown()
     RibbonBar.Shutdown()
     BuffBar.Shutdown()

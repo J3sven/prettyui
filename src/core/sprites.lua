@@ -81,6 +81,13 @@ local Sprites = {
         side = id.Sprite.RS3_HUD_WINDOW_SIDE_TILE,
         content = id.Sprite.RS3_HUD_WINDOW_CONTENT_TILE,
     },
+    MINIMENU = {
+        title = 2026,
+        titleCorner = 2027,
+        side = 2028,
+        bottom = 2029,
+        bottomCorner = 2030,
+    },
     ANCHORED_TOOLTIP = {
         border = {
             topLeft = id.Sprite.RS3_TOOLTIP_BORDER_0,
