@@ -2,6 +2,8 @@ local InterfaceMouse = {}
 
 local DEFAULT_SCALE_PERCENT = 100
 local eventOrigins = setmetatable({}, { __mode = "k" })
+local calibratedScale
+local calibratedInterfaceScale
 
 local function getInterfaceScale()
     local options = game and game.options
@@ -12,21 +14,44 @@ local function getInterfaceScale()
 end
 
 local function screenScale(raw, expectedX, expectedY)
-    local candidates = {}
-    if math.abs(expectedX) >= 32 then
-        table.insert(candidates, raw.x / expectedX)
+    local scaleX = math.abs(expectedX) >= 32 and raw.x / expectedX or nil
+    local scaleY = math.abs(expectedY) >= 32 and raw.y / expectedY or nil
+    if scaleX ~= nil and (scaleX < 0.5 or scaleX > 4) then scaleX = nil end
+    if scaleY ~= nil and (scaleY < 0.5 or scaleY > 4) then scaleY = nil end
+    if scaleX ~= nil and scaleY ~= nil then
+        local average = (scaleX + scaleY) / 2
+        if math.abs(scaleX - scaleY) <= average * 0.1 then
+            return math.abs(expectedX) >= math.abs(expectedY) and scaleX or scaleY
+        end
+        return nil
     end
-    if math.abs(expectedY) >= 32 then
-        table.insert(candidates, raw.y / expectedY)
-    end
-    if #candidates == 2 then
-        local difference = math.abs(candidates[1] - candidates[2])
-        local average = (candidates[1] + candidates[2]) / 2
-        if difference <= average * 0.1 then return average end
-    elseif #candidates == 1 and candidates[1] >= 0.5 and candidates[1] <= 4 then
-        return candidates[1]
-    end
-    return getInterfaceScale()
+    return scaleX or scaleY
+end
+
+local function currentScreenScale()
+    local interfaceScale = getInterfaceScale()
+    if calibratedInterfaceScale == interfaceScale then return calibratedScale end
+    return interfaceScale
+end
+
+-- Hook positions are in interface units; raw mouse positions may additionally
+-- include OS display scaling. A native hook supplies both coordinate systems.
+function InterfaceMouse.CalibrateFromHook(component, x, y)
+    if component == nil or type(x) ~= "number" or type(y) ~= "number" then return false end
+    local raw = Mouse.GetPosition()
+    local origin = component.xyGlobal
+    if raw == nil or origin == nil then return false end
+    local scale = screenScale(raw, origin.x + x, origin.y + y)
+    if scale == nil then return false end
+    calibratedScale = scale
+    calibratedInterfaceScale = getInterfaceScale()
+    return true
+end
+
+function InterfaceMouse.FromRawPosition(raw)
+    if raw == nil then return nil end
+    local scale = currentScreenScale()
+    return { x = raw.x / scale, y = raw.y / scale }
 end
 
 -- Pointer hooks supply coordinates in interface units relative to their
@@ -51,14 +76,7 @@ function InterfaceMouse.GetPosition(component, x, y)
         }
     end
 
-    local position = Mouse.GetPosition()
-    if position == nil then return nil end
-
-    local scale = getInterfaceScale()
-    return {
-        x = position.x / scale,
-        y = position.y / scale,
-    }
+    return InterfaceMouse.FromRawPosition(Mouse.GetPosition())
 end
 
 function InterfaceMouse.BeginScreenCapture(component, x, y)
@@ -69,7 +87,8 @@ function InterfaceMouse.BeginScreenCapture(component, x, y)
     eventOrigins[component] = {
         x = originX,
         y = originY,
-        screenScale = raw and screenScale(raw, originX + x, originY + y) or nil,
+        screenScale = raw and screenScale(raw, originX + x, originY + y)
+            or currentScreenScale(),
     }
 end
 

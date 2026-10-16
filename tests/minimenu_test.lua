@@ -45,6 +45,9 @@ local function component(parent, kind, interfaceID)
         if callback == nil then callback, id = id, "default" end
         self.subscriptions[tostring(hook) .. ":" .. tostring(id)] = callback
     end
+    function result:Unsubscribe(hook, id)
+        self.subscriptions[tostring(hook) .. ":" .. tostring(id or "default")] = nil
+    end
     function result:MoveToFront() end
     function result:Destroy()
         if self.destroyed then return end
@@ -117,6 +120,7 @@ local function font(characterWidth)
 end
 config = { Font = { NOTOSANS_BOLD_12 = font(7), MUSEO_SANS_15PT_REGULAR = font(8) } }
 game = { options = { InterfaceScale = { setting = 100 } } }
+local monitorScale = 1
 local mouse = { x = 320, y = 100 }
 Mouse = { GetPosition = function() return { x = mouse.x, y = mouse.y } end }
 
@@ -175,8 +179,8 @@ local function readyMenu(build, labels)
     return menu
 end
 
-local function hook(componentValue, eventType)
-    return componentValue.subscriptions[tostring(eventType) .. ":default"]
+local function hook(componentValue, eventType, id)
+    return componentValue.subscriptions[tostring(eventType) .. ":" .. tostring(id or "default")]
 end
 local function findOverlay(parent)
     for _, child in ipairs(parent.children) do
@@ -202,8 +206,8 @@ local function click(row)
     if not row.destroyed then return hook(row, ui.Hook.ONCLICK)(row) end
 end
 local function point(x, y)
-    mouse.x = root.xyGlobal.x + x
-    mouse.y = root.xyGlobal.y + y
+    mouse.x = (root.xyGlobal.x + x) * monitorScale
+    mouse.y = (root.xyGlobal.y + y) * monitorScale
 end
 local function openMenu(menu, freshWrappers, x, y)
     point(x or 320, y or 100)
@@ -221,6 +225,15 @@ local function hoverParent(menu, parent, x, y)
     for index, entry in ipairs(menu.entries) do
         if entry == parent then
             point(x or 320, (y or 100) + 22 + (#menu.entries - index) * 15 + 7)
+            if nativeLayer ~= "missing" then
+                local mouseOver = hook(nativeHitbox, ui.Hook.ONMOUSEOVER, "prettyui_minimenu")
+                if mouseOver then
+                    mouseOver(nativeHitbox,
+                        root.xyGlobal.x + (x or 320) - nativeHitbox.xyGlobal.x,
+                        root.xyGlobal.y + (y or 100) + 22 + (#menu.entries - index) * 15 + 7
+                            - nativeHitbox.xyGlobal.y)
+                end
+            end
             emit("Logic")
             return findOverlay(root)
         end
@@ -299,6 +312,42 @@ expect(rightOverlay.destroyed, true, "child selection destroys the overlay")
 expectNativeRestored(originalBounds)
 closeMenu()
 root:SetPos(0, 0)
+-- Raw window pixels may include both OS and in-game interface scaling.
+local baselineX, baselineY
+for _, case in ipairs({
+    { rawScale = 1, interfaceScale = 100 },
+    { rawScale = 1.2, interfaceScale = 100 },
+    { rawScale = 1.8, interfaceScale = 150 },
+}) do
+    monitorScale = case.rawScale
+    game.options.InterfaceScale.setting = case.interfaceScale
+    menu = readyMenu(function(menu)
+        parent = PrettyMiniMenu.AddSubmenu(menu, "PrettyUI actions", children())
+    end)
+    openMenu(menu, true)
+    if case.rawScale > 1 then emit("Logic") end -- hook can arrive after a logic tick
+    local menuOverlay = assert(hoverParent(menu, parent))
+    if baselineX == nil then
+        baselineX, baselineY = menuOverlay.xyGlobal.x, menuOverlay.xyGlobal.y
+    else
+        expect(menuOverlay.xyGlobal.x, baselineX,
+            "monitor scaling keeps the submenu adjacent to the same native row")
+        expect(menuOverlay.xyGlobal.y, baselineY,
+            "monitor scaling preserves the submenu's vertical alignment")
+        mouse.x = (menuOverlay.xyGlobal.x + 5) * monitorScale
+        mouse.y = (menuOverlay.xyGlobal.y + 30) * monitorScale
+        emit("Logic")
+        expect(findOverlay(root), menuOverlay,
+            "scaled pointer entering the child submenu keeps it open")
+        mouse.x = (menuOverlay.xyGlobal.x + menuOverlay.width + 20) * monitorScale
+        emit("Logic")
+        expect(menuOverlay.destroyed, true,
+            "scaled pointer leaving both menus dismisses the submenu")
+    end
+    closeMenu()
+end
+monitorScale = 1
+game.options.InterfaceScale.setting = 100
 
 -- A duplicate is rejected before mutating the native menu, including text
 -- rendered equivalently after colour markup and whitespace normalization.

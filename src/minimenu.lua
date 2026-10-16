@@ -221,6 +221,12 @@ local function destroyOverlay()
 end
 
 local function reset()
+    local state = activeMenu
+    if state ~= nil and state.pointerLayer ~= nil
+            and nativeComponent(state.pointerLayerID) == state.pointerLayer then
+        state.pointerLayer:Unsubscribe(ui.Hook.ONMOUSEOVER, EVENT_ID)
+        state.pointerLayer:Unsubscribe(ui.Hook.ONMOUSEREPEAT, EVENT_ID)
+    end
     activeMenu = nil
     parentsByEntry = {}
     parentsByText = {}
@@ -437,6 +443,29 @@ local function menuDimensions(entries, viewportHeight)
     return width, height, visibleRows
 end
 
+local function placeNativeMenu(state, mouse)
+    local origin = state.parent.xyGlobal or { x = 0, y = 0 }
+    local mouseX = mouse.x - origin.x
+    local mouseY = mouse.y - origin.y
+    state.rootX = clamp(math.floor(mouseX - state.rootWidth / 2),
+        0, state.viewportWidth - state.rootWidth)
+    state.rootY = clamp(math.floor(mouseY), 0, state.viewportHeight - state.rootHeight)
+end
+
+-- Keep the raw opening point until the native hook calibrates the shared
+-- pointer conversion; the cursor may have moved by the time the hook runs.
+local function calibratePointer(state, component, x, y)
+    if activeMenu ~= state or state.pointerLayer == nil then return true end
+    if not InterfaceMouse.CalibrateFromHook(component, x, y) then return true end
+    if overlay ~= nil then destroyOverlay() end
+    placeNativeMenu(state, InterfaceMouse.FromRawPosition(state.openPointer))
+    state.openPointer = nil
+    state.pointerLayer:Unsubscribe(ui.Hook.ONMOUSEOVER, EVENT_ID)
+    state.pointerLayer:Unsubscribe(ui.Hook.ONMOUSEREPEAT, EVENT_ID)
+    state.pointerLayer = nil
+    return true
+end
+
 local function onOpened(event)
     local byEntry, byText = parentsByEntry, parentsByText
     reset()
@@ -458,18 +487,15 @@ local function onOpened(event)
 
     local parent = ui.Interfaces:GetComponent(id.Component.TOPLEVEL_V2__ROOT)
         or ui.Interfaces:GetComponent(id.Component.TOPLEVEL_V2__GAME_AREA)
-    local mouse = InterfaceMouse.GetPosition()
-    if parent == nil or mouse == nil or parent.width <= 0 or parent.height <= 0 then
+    local raw = Mouse.GetPosition()
+    if parent == nil or raw == nil or parent.width <= 0 or parent.height <= 0 then
         return
     end
 
-    local origin = parent.xyGlobal or { x = 0, y = 0 }
-    local mouseX = mouse.x - origin.x
-    local mouseY = mouse.y - origin.y
     local width, height, visibleRows = menuDimensions(entries, parent.height)
     width = math.min(width, parent.width)
-
-    activeMenu = {
+    local pointerLayer, pointerLayerID = nativeMouseLeaveLayer()
+    local state = {
         parent = parent,
         interfaceID = parent.interfaceID,
         entryCount = #entries,
@@ -479,9 +505,20 @@ local function onOpened(event)
         rootWidth = width,
         rootHeight = height,
         rootVisibleRows = visibleRows,
-        rootX = clamp(math.floor(mouseX - width / 2), 0, parent.width - width),
-        rootY = clamp(math.floor(mouseY), 0, parent.height - height),
+        pointerLayer = pointerLayer,
+        pointerLayerID = pointerLayerID,
+        openPointer = pointerLayer and raw or nil,
     }
+    activeMenu = state
+    if pointerLayer ~= nil then
+        local function onPointer(component, x, y)
+            return calibratePointer(state, component, x, y)
+        end
+        pointerLayer:Subscribe(ui.Hook.ONMOUSEOVER, EVENT_ID, onPointer)
+        pointerLayer:Subscribe(ui.Hook.ONMOUSEREPEAT, EVENT_ID, onPointer)
+    else
+        placeNativeMenu(state, InterfaceMouse.FromRawPosition(raw))
+    end
 end
 
 local function inside(x, y, left, top, width, height)
@@ -498,6 +535,11 @@ local function onLogic()
 
     local mouse = InterfaceMouse.GetPosition()
     if mouse == nil then return end
+    if state.rootX == nil then
+        -- Some client builds may not dispatch mouse hooks on this native layer.
+        -- Keep the previous positioning behavior until calibration arrives.
+        placeNativeMenu(state, mouse)
+    end
     local origin = state.parent.xyGlobal or { x = 0, y = 0 }
     local x = mouse.x - origin.x
     local y = mouse.y - origin.y
