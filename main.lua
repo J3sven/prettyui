@@ -9,6 +9,7 @@ local Dialog = require("src/dialog")
 local Confirm = require("src/confirm")
 local SelectionButtons = require("src/selection_button")
 local PrettyMiniMenu = require("src/minimenu")
+local OverheadBar = require("src/overhead_bar")
 
 local resources = Plugin.resources
 TextField.SetDefaultSprite(resources and (resources.input_default or resources["input_default.png"]))
@@ -34,6 +35,7 @@ local PrettyUI = {
     List = require("src/list"),
     MiniMenu = PrettyMiniMenu,
     Panel = require("src/panel"),
+    OverheadBar = OverheadBar,
     Sprites = require("src/core/sprites"),
     RibbonButton = require("src/ribbon_button"),
     RibbonBar = RibbonBar,
@@ -67,6 +69,7 @@ function PluginShutdown()
     TimeGraph.Shutdown()
     BarChart.Shutdown()
     Histogram.Shutdown()
+    OverheadBar.Shutdown()
 end
 
 return PrettyUI
