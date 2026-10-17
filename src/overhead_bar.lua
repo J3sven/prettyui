@@ -3,8 +3,6 @@ local Sprites = require("src/core/sprites")
 local OverheadBar = {}
 OverheadBar.__index = OverheadBar
 
--- Native hitbar/progress sprites are drawn at their original dimensions. The
--- foreground is clipped by its parent layer, rather than stretched as it fills.
 local variants = Sprites.OVERHEAD_BARS
 OverheadBar.Variants = variants
 
